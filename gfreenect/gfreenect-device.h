@@ -46,7 +46,8 @@ struct _GFreenectDeviceClass
   GObjectClass parent_class;
 
   /* Signal prototypes */
-  void (* depth_frame) (GFreenectDevice *self, gpointer some_data);
+  void (* depth_frame) (GFreenectDevice *self, gpointer user_data);
+  void (* video_frame) (GFreenectDevice *self, gpointer user_data);
 };
 
 #define GFREENECT_TYPE_DEVICE           (gfreenect_device_get_type ())

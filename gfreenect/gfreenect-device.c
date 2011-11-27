@@ -77,6 +77,7 @@ typedef struct
 enum
 {
   SIGNAL_DEPTH_FRAME,
+  SIGNAL_VIDEO_FRAME,
   LAST_SIGNAL
 };
 
@@ -145,6 +146,15 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
           G_TYPE_FROM_CLASS (obj_class),
           G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
           G_STRUCT_OFFSET (GFreenectDeviceClass, depth_frame),
+          NULL, NULL,
+          g_cclosure_marshal_VOID__VOID,
+          G_TYPE_NONE, 0);
+
+  gfreenect_device_signals[SIGNAL_VIDEO_FRAME] =
+    g_signal_new ("video-frame",
+          G_TYPE_FROM_CLASS (obj_class),
+          G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+          G_STRUCT_OFFSET (GFreenectDeviceClass, video_frame),
           NULL, NULL,
           g_cclosure_marshal_VOID__VOID,
           G_TYPE_NONE, 0);
