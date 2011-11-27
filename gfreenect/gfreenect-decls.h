@@ -46,6 +46,17 @@ typedef enum {
 } GFreenectDepthFormat;
 
 typedef enum {
+  GFREENECT_VIDEO_FORMAT_RGB             = 0, /**< Decompressed RGB mode (demosaicing done by libfreenect) */
+  GFREENECT_VIDEO_FORMAT_BAYER           = 1, /**< Bayer compressed mode (raw information from camera) */
+  GFREENECT_VIDEO_FORMAT_IR_8BIT         = 2, /**< 8-bit IR mode  */
+  GFREENECT_VIDEO_FORMAT_IR_10BIT        = 3, /**< 10-bit IR mode */
+  GFREENECT_VIDEO_FORMAT_IR_10BIT_PACKED = 4, /**< 10-bit packed IR mode */
+  GFREENECT_VIDEO_FORMAT_YUV_RGB         = 5, /**< YUV RGB mode */
+  GFREENECT_VIDEO_FORMAT_YUV_RAW         = 6, /**< YUV Raw mode */
+  GFREENECT_VIDEO_FORMAT_DUMMY           = G_MAXUINT32, /**< Dummy value to force enum to be 32 bits wide */
+} GFreenectVideoFormat;
+
+typedef enum {
   GFREENECT_LED_OFF              = 0,
   GFREENECT_LED_GREEN            = 1,
   GFREENECT_LED_RED              = 2,
