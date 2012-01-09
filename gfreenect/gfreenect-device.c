@@ -89,7 +89,8 @@ enum
   PROP_0,
   PROP_INDEX,
   PROP_SUBDEVICES,
-  PROP_LED
+  PROP_LED,
+  PROP_TILT_ANGLE
 };
 
 
@@ -192,6 +193,17 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
                                                       GFREENECT_LED_OFF,
                                                       G_PARAM_READWRITE |
                                                       G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (obj_class,
+                                   PROP_TILT_ANGLE,
+                                   g_param_spec_double ("tilt-angle",
+                                                        "Tilt angle",
+                                                        "Vertical angle relative to the horizon",
+                                                        -30.0,
+                                                        30.0,
+                                                        DEFAULT_TILT_ANGLE,
+                                                        G_PARAM_READWRITE |
+                                                        G_PARAM_STATIC_STRINGS));
 
   /* add private structure */
   g_type_class_add_private (obj_class, sizeof (GFreenectDevicePrivate));
@@ -299,6 +311,10 @@ gfreenect_device_set_property (GObject      *obj,
       gfreenect_device_set_led (self, g_value_get_uint (value));
       break;
 
+    case PROP_TILT_ANGLE:
+      gfreenect_device_set_tilt_angle (self, g_value_get_double (value));
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (obj, prop_id, pspec);
       break;
@@ -327,6 +343,10 @@ gfreenect_device_get_property (GObject    *obj,
 
     case PROP_LED:
       g_value_set_uint (value, self->priv->led);
+      break;
+
+    case PROP_TILT_ANGLE:
+      g_value_set_double (value, self->priv->tilt_angle);
       break;
 
     default:
