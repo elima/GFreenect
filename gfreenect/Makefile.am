@@ -83,7 +83,7 @@ introspection_sources = $(gfreenect_HEADERS) $(source_c)
 @PRJ_GIR_API_NAME@.gir: lib@PRJ_API_NAME@.la Makefile
 @PRJ_GIR_TARGET_NAME@_INCLUDES = GObject-2.0 Gio-2.0
 @PRJ_GIR_TARGET_NAME@_CFLAGS = $(INCLUDES)
-@PRJ_GIR_TARGET_NAME@_LIBS = @PRJ_API_NAME@ m
+@PRJ_GIR_TARGET_NAME@_LIBS = @PRJ_API_NAME@ m freenect
 @PRJ_GIR_TARGET_NAME@_NAMESPACE = @PRJ_GIR_NAMESPACE@
 @PRJ_GIR_TARGET_NAME@_FILES = $(addprefix $(srcdir)/,$(introspection_sources))
 
