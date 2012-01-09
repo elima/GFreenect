@@ -89,6 +89,9 @@ guint8 *          gfreenect_device_get_depth_frame_grayscale  (GFreenectDevice *
 void              gfreenect_device_set_tilt_angle             (GFreenectDevice *self,
                                                                gdouble          tilt_angle);
 
+gdouble           gfreenect_device_get_tilt_angle             (GFreenectDevice *self);
+
+
 G_END_DECLS
 
 #endif /* __GFREENECT_DEVICE_H__ */

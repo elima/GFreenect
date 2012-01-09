@@ -947,3 +947,18 @@ gfreenect_device_set_tilt_angle (GFreenectDevice *self, gdouble tilt_angle)
 
   g_mutex_unlock (self->priv->mutex);
 }
+
+gdouble
+gfreenect_device_get_tilt_angle (GFreenectDevice *self)
+{
+  freenect_raw_tilt_state *state;
+  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  if (freenect_update_tilt_state (self->priv->dev) == -1)
+    {
+      g_warning("Failed to get the angle %d", freenect_update_tilt_state (self->priv->dev));
+      return 0.0;
+    }
+  state = freenect_get_tilt_state (self->priv->dev);
+  return (gdouble) freenect_get_tilt_degs (state);
+}
