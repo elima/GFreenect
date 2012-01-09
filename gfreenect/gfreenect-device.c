@@ -786,6 +786,20 @@ gfreenect_device_start_depth_stream (GFreenectDevice *self, GError **error)
 }
 
 gboolean
+gfreenect_device_stop_depth_stream (GFreenectDevice *self)
+{
+  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  if (freenect_stop_depth (self->priv->dev) != 0)
+    {
+      g_warning ("Failed to stop depth stream");
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+gboolean
 gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
