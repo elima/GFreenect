@@ -30,8 +30,11 @@
                                            GFREENECT_TYPE_DEVICE, \
                                            GFreenectDevicePrivate))
 
-#define DEFAULT_SUBDEVICES   GFREENECT_SUBDEVICE_CAMERA | GFREENECT_SUBDEVICE_MOTOR
-#define DEFAULT_DEPTH_FORMAT GFREENECT_DEPTH_FORMAT_11BIT
+#define DEFAULT_SUBDEVICES       GFREENECT_SUBDEVICE_CAMERA | GFREENECT_SUBDEVICE_MOTOR
+#define DEFAULT_DEPTH_FORMAT     GFREENECT_DEPTH_FORMAT_11BIT
+#define DEFAULT_VIDEO_RESOLUTION GFREENECT_RESOLUTION_MEDIUM
+#define DEFAULT_VIDEO_FORMAT     GFREENECT_VIDEO_FORMAT_RGB
+#define DEFAULT_TILT_ANGLE       0.0
 
 #define USER_BUF_SIZE 1280 * 1024 * 3
 
@@ -43,6 +46,8 @@ struct _GFreenectDevicePrivate
   gint index;
   guint subdevices;
   GFreenectDepthFormat depth_format;
+  GFreenectVideoFormat video_format;
+  GFreenectResolution video_resolution;
   GFreenectLed led;
   gdouble tilt_angle;
 
@@ -50,19 +55,25 @@ struct _GFreenectDevicePrivate
   freenect_device *dev;
 
   freenect_frame_mode depth_mode;
+  freenect_frame_mode video_mode;
 
   GThread *dispatch_thread;
   GMutex *mutex;
   gboolean abort_dispatch_thread;
 
-  guint dispatch_src_id;
+  guint depth_frame_src_id;
+  guint video_frame_src_id;
 
   void *user_buf;
 
   void *depth_buf;
   gboolean got_depth_frame;
 
+  void *video_buf;
+  gboolean got_video_frame;
+
   gboolean update_tilt_angle;
+  gboolean update_led;
 };
 
 /* constructor data */
@@ -237,6 +248,9 @@ gfreenect_device_init (GFreenectDevice *self)
 
   priv->dispatch_thread = NULL;
   priv->mutex = g_mutex_new ();
+
+  priv->video_resolution = DEFAULT_VIDEO_RESOLUTION;
+  priv->video_format = DEFAULT_VIDEO_FORMAT;
 }
 
 static void
@@ -244,11 +258,29 @@ gfreenect_device_dispose (GObject *obj)
 {
   GFreenectDevice *self = GFREENECT_DEVICE (obj);
 
+  g_mutex_lock (self->priv->mutex);
+
+  if (self->priv->depth_frame_src_id != 0)
+    {
+      g_source_remove (self->priv->depth_frame_src_id);
+      self->priv->depth_frame_src_id = 0;
+    }
+
+  if (self->priv->video_frame_src_id != 0)
+    {
+      g_source_remove (self->priv->video_frame_src_id);
+      self->priv->video_frame_src_id = 0;
+    }
+
+  g_mutex_unlock (self->priv->mutex);
+
   if (self->priv->dispatch_thread != NULL)
     {
       self->priv->abort_dispatch_thread = TRUE;
       g_thread_join (self->priv->dispatch_thread);
     }
+
+  g_mutex_free (self->priv->mutex);
 
   if (self->priv->dev != NULL)
     {
@@ -262,8 +294,6 @@ gfreenect_device_dispose (GObject *obj)
       self->priv->ctx = NULL;
     }
 
-  g_debug ("dispose");
-
   G_OBJECT_CLASS (gfreenect_device_parent_class)->dispose (obj);
 }
 
@@ -276,6 +306,12 @@ gfreenect_device_finalize (GObject *obj)
     {
       g_slice_free1 (self->priv->depth_mode.bytes, self->priv->depth_buf);
       self->priv->depth_buf = NULL;
+    }
+
+  if (self->priv->video_buf != NULL)
+    {
+      g_slice_free1 (self->priv->video_mode.bytes, self->priv->video_buf);
+      self->priv->video_buf = NULL;
     }
 
   if (self->priv->user_buf != NULL)
@@ -392,7 +428,7 @@ on_depth_frame_main_loop (gpointer user_data)
 
   g_mutex_lock (self->priv->mutex);
 
-  self->priv->dispatch_src_id = 0;
+  self->priv->depth_frame_src_id = 0;
 
   if (self->priv->got_depth_frame)
     {
@@ -405,6 +441,7 @@ on_depth_frame_main_loop (gpointer user_data)
 
   return FALSE;
 }
+
 
 static void
 on_depth_frame (freenect_device *dev, void *depth, uint32_t timestamp)
@@ -419,13 +456,62 @@ on_depth_frame (freenect_device *dev, void *depth, uint32_t timestamp)
 
   memcpy (self->priv->depth_buf, depth, self->priv->depth_mode.bytes);
 
-  if (self->priv->dispatch_src_id == 0)
+  if (self->priv->depth_frame_src_id == 0)
     {
-      self->priv->dispatch_src_id = timeout_add (self->priv->glib_context,
-                                                 0,
-                                                 G_PRIORITY_DEFAULT,
-                                                 on_depth_frame_main_loop,
-                                                 self);
+      self->priv->depth_frame_src_id = timeout_add (self->priv->glib_context,
+                                                    0,
+                                                    G_PRIORITY_DEFAULT,
+                                                    on_depth_frame_main_loop,
+                                                    self);
+    }
+
+  g_mutex_unlock (self->priv->mutex);
+}
+
+static gboolean
+on_video_frame_main_loop (gpointer user_data)
+{
+  GFreenectDevice *self = GFREENECT_DEVICE (user_data);
+
+  g_mutex_lock (self->priv->mutex);
+
+  self->priv->video_frame_src_id = 0;
+
+  if (self->priv->got_video_frame)
+    {
+      self->priv->got_video_frame = FALSE;
+
+      g_signal_emit (self,
+                     gfreenect_device_signals[SIGNAL_VIDEO_FRAME],
+                     0,
+                     NULL);
+    }
+
+  g_mutex_unlock (self->priv->mutex);
+
+  return FALSE;
+}
+
+static void
+on_video_frame (freenect_device *dev, void *buf, uint32_t timestamp)
+{
+  GFreenectDevice *self;
+
+  self = freenect_get_user (dev);
+
+  g_mutex_lock (self->priv->mutex);
+
+  self->priv->got_video_frame = TRUE;
+
+  memcpy (self->priv->video_buf, buf, self->priv->video_mode.bytes);
+
+  if (self->priv->video_frame_src_id == 0)
+    {
+      self->priv->video_frame_src_id = timeout_add (self->priv->glib_context,
+                                                    0,
+                                                    G_PRIORITY_DEFAULT,
+                                                    on_video_frame_main_loop,
+                                                    self);
     }
 
   g_mutex_unlock (self->priv->mutex);
@@ -463,6 +549,7 @@ init_sync (GInitable     *initable,
   freenect_set_user (self->priv->dev, self);
 
   freenect_set_depth_callback (self->priv->dev, on_depth_frame);
+  freenect_set_video_callback (self->priv->dev, on_video_frame);
 
   self->priv->user_buf = g_slice_alloc (USER_BUF_SIZE);
 
@@ -482,7 +569,6 @@ init_in_thread (gpointer _data)
     }
   else
     {
-      g_object_ref (data->self);
       g_object_ref (data->self);
       g_simple_async_result_set_op_res_gpointer (data->result,
                                                  data->self,
@@ -558,10 +644,24 @@ dispatch_thread_func (gpointer _data)
           g_mutex_unlock (self->priv->mutex);
         }
 
-      if (self->priv->abort_dispatch_thread)
-        abort = TRUE;
+      if (self->priv->update_led)
+        {
+          g_mutex_lock (self->priv->mutex);
+
+          self->priv->update_led = FALSE;
+
+          if (freenect_set_led (self->priv->dev, self->priv->led) != 0)
+            {
+              /* @TODO: this error must be reported! */
+            }
+
+          g_mutex_unlock (self->priv->mutex);
+        }
 
       freenect_process_events (self->priv->ctx);
+
+      if (self->priv->abort_dispatch_thread)
+        abort = TRUE;
     }
 
   return NULL;
@@ -570,11 +670,14 @@ dispatch_thread_func (gpointer _data)
 static gboolean
 launch_dispatch_thread (GFreenectDevice *self, GError **error)
 {
-  self->priv->dispatch_src_id = 0;
+  self->priv->depth_frame_src_id = 0;
+  self->priv->video_frame_src_id = 0;
+
   self->priv->glib_context = g_main_context_get_thread_default ();
   self->priv->abort_dispatch_thread = FALSE;
 
   self->priv->update_tilt_angle = FALSE;
+  self->priv->update_led = FALSE;
 
   self->priv->dispatch_thread = g_thread_create (dispatch_thread_func,
                                                  self,
@@ -682,22 +785,69 @@ gfreenect_device_start_depth_stream (GFreenectDevice *self, GError **error)
     return TRUE;
 }
 
+gboolean
+gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
+
+  /* free current depth buffer */
+  if (self->priv->video_buf != NULL)
+    {
+      g_slice_free1 (self->priv->video_mode.bytes, self->priv->video_buf);
+      self->priv->video_buf = NULL;
+    }
+
+  self->priv->video_mode = freenect_find_video_mode (self->priv->video_resolution,
+                                                     self->priv->video_format);
+
+  if (freenect_set_video_mode (self->priv->dev, self->priv->video_mode) != 0)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to set video mode");
+      return FALSE;
+    }
+
+  if (freenect_start_video (self->priv->dev) != 0)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to start video stream");
+      return FALSE;
+    }
+
+  self->priv->video_buf = g_slice_alloc (self->priv->video_mode.bytes);
+  self->priv->got_video_frame = FALSE;
+
+  if (self->priv->dispatch_thread == NULL)
+    return launch_dispatch_thread (self, error);
+  else
+    return TRUE;
+}
+
 void
 gfreenect_device_set_led (GFreenectDevice *self, GFreenectLed led)
 {
   g_return_if_fail (GFREENECT_IS_DEVICE (self));
 
-  self->priv->led = led;
+  if (self->priv->dispatch_thread == NULL)
+    launch_dispatch_thread (self, NULL);
 
-  if (freenect_set_led (self->priv->dev, self->priv->led) != 0)
-    g_warning ("Failed to set led status");
+  g_mutex_lock (self->priv->mutex);
+
+  self->priv->led = led;
+  self->priv->update_led = TRUE;
+
+  g_mutex_unlock (self->priv->mutex);
 }
 
 /**
  * gfreenect_device_get_depth_frame_raw:
  * @len: (out):
  *
- * Returns: (type guint):
+ * Returns: (array length=len) (element-type guint8):
  **/
 guint8 *
 gfreenect_device_get_depth_frame_raw (GFreenectDevice *self, gsize *len)
@@ -707,14 +857,31 @@ gfreenect_device_get_depth_frame_raw (GFreenectDevice *self, gsize *len)
   if (len != NULL)
     *len = self->priv->depth_mode.bytes;
 
-  return (guint8 *) self->priv->depth_buf;
+  return self->priv->depth_buf;
+}
+
+/**
+ * gfreenect_device_get_video_frame_raw:
+ * @len: (out) (allow-none):
+ *
+ * Returns: (array length=len) (element-type guint8) (transfer none):
+ **/
+guint8 *
+gfreenect_device_get_video_frame_raw (GFreenectDevice *self, gsize *len)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), NULL);
+
+  if (len != NULL)
+    *len = self->priv->video_mode.bytes;
+
+  return (guint8 *) self->priv->video_buf;
 }
 
 /**
  * gfreenect_device_get_depth_frame_grayscale:
  * @len: (out) (allow-none):
  *
- * Returns: (array fixed-size=921600) (element-type guint8) (transfer none):
+ * Returns: (array length=len) (element-type guint8) (transfer none):
  **/
 guint8 *
 gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
@@ -737,7 +904,6 @@ gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
   for (i=0; i < pixels; i++)
     {
       d = ((double) data[i]) / 2048.0;
-      //      d = d*d*d;
 
       c = round (d * 256);
 

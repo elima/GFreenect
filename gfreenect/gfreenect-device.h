@@ -70,12 +70,17 @@ GFreenectDevice * gfreenect_device_new_finish                 (GAsyncResult  *re
 
 gboolean          gfreenect_device_start_depth_stream         (GFreenectDevice  *self,
                                                                GError          **error);
+gboolean          gfreenect_device_start_video_stream         (GFreenectDevice  *self,
+                                                               GError          **error);
 
 void              gfreenect_device_set_led                    (GFreenectDevice *self,
                                                                GFreenectLed     led);
 
 guint8 *          gfreenect_device_get_depth_frame_raw        (GFreenectDevice *self,
                                                                gsize           *len);
+guint8 *          gfreenect_device_get_video_frame_raw        (GFreenectDevice *self,
+                                                               gsize           *len);
+
 guint8 *          gfreenect_device_get_depth_frame_grayscale  (GFreenectDevice *self,
                                                                gsize           *len);
 
