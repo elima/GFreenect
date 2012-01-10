@@ -998,6 +998,7 @@ gfreenect_device_get_tilt_angle (GFreenectDevice *self)
 
   g_return_if_fail (GFREENECT_IS_DEVICE (self));
 
+  /* @TODO: This is blocking... move to dispatch thread */
   if (freenect_update_tilt_state (self->priv->dev) == -1)
     {
       g_warning ("Failed to get the tilt state");
