@@ -2,7 +2,7 @@
  * gfreenect-device.h
  *
  * gfreenect - A GObject wrapper of the libfreenect library
- * Copyright (C) 2011 Igalia S.L/
+ * Copyright (C) 2011 Igalia S.L.
  *
  * Authors:
  *  Eduardo Lima Mitev <elima@igalia.com>

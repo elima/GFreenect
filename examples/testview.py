@@ -1,3 +1,25 @@
+#
+# testview.py
+#
+# gfreenect - A GObject wrapper of the libfreenect library
+# Copyright (C) 2011 Igalia S.L.
+#
+# Authors:
+#   Joaquim Manuel Pereira Rocha <jrocha@igalia.com>
+#   Eduardo Lima Mitev <elima@igalia.com>
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 3 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# Lesser General Public License at http://www.gnu.org/licenses/lgpl-3.0.txt
+# for more details.
+#
+
 import sys
 from gi.repository import GFreenect
 from gi.repository import Clutter

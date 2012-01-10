@@ -2,7 +2,7 @@
  * gfreenect.h
  *
  * gfreenect - A GObject wrapper of the libfreenect library
- * Copyright (C) 2011 Igalia S.L/
+ * Copyright (C) 2011 Igalia S.L.
  *
  * Authors:
  *  Joaquim Manuel Pereira Rocha <jrocha@igalia.com>
