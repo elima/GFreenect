@@ -85,7 +85,7 @@ class GFreenectView(Gtk.Window):
         self.kinect = kinect
         success = self.kinect.new_finish(result)
         self.kinect.set_led(GFreenect.Led.GREEN)
-        self.kinect.set_property("tilt-angle", self.tilt_scale.get_value());
+        self.kinect.set_tilt_angle(self.tilt_scale.get_value());
         self.kinect.connect("depth-frame",
                             self._on_depth_frame,
                             None)
