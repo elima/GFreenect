@@ -188,6 +188,8 @@ class GFreenectView(Gtk.Window):
         self.kinect.set_led(led_mode)
 
     def _on_delete_event(self, window, event):
+        if self.kinect:
+            self.kinect.stop_depth_stream()
         Gtk.main_quit()
 
 if __name__ == '__main__':
