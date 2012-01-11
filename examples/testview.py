@@ -125,7 +125,14 @@ class GFreenectView(Gtk.Window):
 
     def _on_kinect_ready(self, kinect, result, layout_manager):
         self.kinect = kinect
-        success = self.kinect.new_finish(result)
+        try:
+            self.kinect.new_finish(result)
+        except Exception, e:
+            dialog = self._create_error_dialog('Error:\n %s' % e.message)
+            dialog.run()
+            dialog.destroy()
+            Gtk.main_quit()
+            return
         self.kinect.set_led(GFreenect.Led.GREEN)
         self.kinect.set_tilt_angle(self._tilt_scale.get_value(),
                                    None,
@@ -186,6 +193,13 @@ class GFreenectView(Gtk.Window):
         iter = combobox.get_active_iter()
         led_mode = model.get_value(iter, 1)
         self.kinect.set_led(led_mode)
+
+    def _create_error_dialog(self, message):
+        return Gtk.MessageDialog(self,
+                                 Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
+                                 Gtk.MessageType.ERROR,
+                                 Gtk.ButtonsType.CLOSE,
+                                 message)
 
     def _on_delete_event(self, window, event):
         if self.kinect:
