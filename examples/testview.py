@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # testview.py
 #
@@ -95,10 +96,11 @@ class GFreenectView(Gtk.Window):
         tilt_scale = Gtk.Scale.new_with_range(Gtk.Orientation.VERTICAL,
                                               -31, 31, 1)
         tilt_scale.set_value(0)
-        tilt_scale.add_mark(-31, Gtk.PositionType.LEFT, '-31')
-        tilt_scale.add_mark(0, Gtk.PositionType.LEFT, '0')
-        tilt_scale.add_mark(31, Gtk.PositionType.LEFT, '31')
+        tilt_scale.add_mark(31, Gtk.PositionType.LEFT, '-31 º')
+        tilt_scale.add_mark(0, Gtk.PositionType.LEFT, '0 º')
+        tilt_scale.add_mark(-31, Gtk.PositionType.LEFT, '31 º')
         tilt_scale.connect('value-changed', self._on_scale_value_changed)
+        tilt_scale.connect('format-value', self._on_scale_format_value)
         return tilt_scale
 
     def _create_led_combobox(self):
@@ -169,9 +171,12 @@ class GFreenectView(Gtk.Window):
             GObject.source_remove(self._tilt_scale_timeout)
         self._tilt_scale_timeout = GObject.timeout_add(500, self._scale_value_changed_timeout)
 
+    def _on_scale_format_value(self, scale, value):
+        return '%s º   ' % int(-value)
+
     def _scale_value_changed_timeout(self):
         self._tilt_scale.set_sensitive(False)
-        self.kinect.set_tilt_angle(self._tilt_scale.get_value(),
+        self.kinect.set_tilt_angle(-self._tilt_scale.get_value(),
                                    None,
                                    self._on_set_tilt_finish,
                                    None)
