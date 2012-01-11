@@ -1074,6 +1074,12 @@ gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
   return rgb_buf;
 }
 
+/**
+ * gfreenect_device_set_tilt_angle:
+ * @cancellable: (allow-none):
+ * @callback: (scope async):
+ *
+ **/
 void
 gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
                                  gdouble              tilt_angle,
