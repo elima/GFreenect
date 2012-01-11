@@ -103,11 +103,21 @@ class GFreenectView(Gtk.Window):
         led_combobox.connect('changed', self._on_combobox_changed)
         return led_combobox
 
+    def _on_set_tilt_finish(self, kinect, result, user_data):
+        try:
+            kinect.set_tilt_angle_finish(result)
+        except:
+            pass
+        self.tilt_scale.set_sensitive(True)
+
     def _on_kinect_ready(self, kinect, result, layout_manager):
         self.kinect = kinect
         success = self.kinect.new_finish(result)
         self.kinect.set_led(GFreenect.Led.GREEN)
-        self.kinect.set_tilt_angle(self.tilt_scale.get_value());
+        self.kinect.set_tilt_angle(self.tilt_scale.get_value(),
+                                   None,
+                                   self._on_set_tilt_finish,
+                                   None);
         self.kinect.connect("depth-frame",
                             self._on_depth_frame,
                             None)
@@ -149,8 +159,11 @@ class GFreenectView(Gtk.Window):
         self._tilt_scale_timeout = GObject.timeout_add(500, self._scale_value_changed_timeout)
 
     def _scale_value_changed_timeout(self):
-        # self.tilt_scale.set_sensitive(False)
-        self.kinect.set_tilt_angle(self.tilt_scale.get_value())
+        self.tilt_scale.set_sensitive(False)
+        self.kinect.set_tilt_angle(self.tilt_scale.get_value(),
+                                   None,
+                                   self._on_set_tilt_finish,
+                                   None)
 
     def _on_combobox_changed(self, combobox):
         model = combobox.get_model()
