@@ -23,6 +23,7 @@
 #include <libfreenect.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "gfreenect-device.h"
 
@@ -50,6 +51,7 @@ struct _GFreenectDevicePrivate
   GFreenectResolution video_resolution;
   GFreenectLed led;
   gdouble tilt_angle;
+  gboolean tilt_motor_moving;
 
   freenect_context *ctx;
   freenect_device *dev;
@@ -78,6 +80,8 @@ struct _GFreenectDevicePrivate
 
   gboolean update_tilt_angle;
   gboolean update_led;
+
+  GSimpleAsyncResult *tilt_result;
 };
 
 /* constructor data */
@@ -258,6 +262,9 @@ gfreenect_device_init (GFreenectDevice *self)
 
   priv->video_resolution = DEFAULT_VIDEO_RESOLUTION;
   priv->video_format = DEFAULT_VIDEO_FORMAT;
+
+  priv->tilt_result = NULL;
+  priv->tilt_motor_moving = FALSE;
 }
 
 static void
@@ -297,6 +304,22 @@ gfreenect_device_dispose (GObject *obj)
 
       g_thread_join (self->priv->dispatch_thread);
       self->priv->dispatch_thread = NULL;
+
+      g_mutex_unlock (self->priv->dispatch_mutex);
+    }
+
+  if (self->priv->tilt_result != NULL)
+    {
+      g_mutex_lock (self->priv->dispatch_mutex);
+
+      g_simple_async_result_set_error (self->priv->tilt_result,
+                                       G_IO_ERROR,
+                                       G_IO_ERROR_CANCELLED,
+                                       "Tilt operation cancelled upon device disposal");
+
+      g_simple_async_result_complete (self->priv->tilt_result);
+      g_object_unref (self->priv->tilt_result);
+      self->priv->tilt_result = NULL;
 
       g_mutex_unlock (self->priv->dispatch_mutex);
     }
@@ -361,7 +384,11 @@ gfreenect_device_set_property (GObject      *obj,
       break;
 
     case PROP_TILT_ANGLE:
-      gfreenect_device_set_tilt_angle (self, g_value_get_double (value));
+      gfreenect_device_set_tilt_angle (self,
+                                       g_value_get_double (value),
+                                       NULL,
+                                       NULL,
+                                       NULL);
       break;
 
     default:
@@ -655,9 +682,55 @@ dispatch_thread_func (gpointer _data)
           if (freenect_set_tilt_degs (self->priv->dev, self->priv->tilt_angle) != 0)
             {
               /* @TODO: this error must be reported! */
+              g_warning ("Failed to set tilt");
             }
 
           g_mutex_unlock (self->priv->dispatch_mutex);
+        }
+      else if (self->priv->tilt_result != NULL)
+        {
+          freenect_raw_tilt_state *state;
+
+          if (freenect_update_tilt_state (self->priv->dev) == -1)
+            {
+              /* @TODO: this error must be reported! */
+              g_warning ("Failed to get the tilt state");
+
+              /* complete the 'set-tilt' operation with error */
+              g_mutex_lock (self->priv->dispatch_mutex);
+
+              g_simple_async_result_set_error (self->priv->tilt_result,
+                                               G_IO_ERROR,
+                                               G_IO_ERROR_FAILED,
+                                               "Failed to obtain tilt state");
+              g_simple_async_result_complete_in_idle (self->priv->tilt_result);
+              g_object_unref (self->priv->tilt_result);
+              self->priv->tilt_result = NULL;
+
+              g_mutex_unlock (self->priv->dispatch_mutex);
+            }
+          else
+            {
+              state = freenect_get_tilt_state (self->priv->dev);
+
+              if (state->tilt_status != TILT_STATUS_MOVING && self->priv->tilt_motor_moving)
+                {
+                  /* complete the 'set-tilt' operation */
+                  g_mutex_lock (self->priv->dispatch_mutex);
+
+                  self->priv->tilt_motor_moving = FALSE;
+
+                  g_simple_async_result_complete_in_idle (self->priv->tilt_result);
+                  g_object_unref (self->priv->tilt_result);
+                  self->priv->tilt_result = NULL;
+
+                  g_mutex_unlock (self->priv->dispatch_mutex);
+                }
+              else if (state->tilt_status == TILT_STATUS_MOVING)
+                {
+                  self->priv->tilt_motor_moving = TRUE;
+                }
+            }
         }
 
       if (self->priv->update_led)
@@ -669,6 +742,7 @@ dispatch_thread_func (gpointer _data)
           if (freenect_set_led (self->priv->dev, self->priv->led) != 0)
             {
               /* @TODO: this error must be reported! */
+              g_warning ("Failed to set led");
             }
 
           g_mutex_unlock (self->priv->dispatch_mutex);
@@ -727,6 +801,31 @@ launch_stream_thread (GFreenectDevice *self, GError **error)
                                                TRUE,
                                                error);
   return self->priv->stream_thread != NULL;
+}
+
+static void
+on_set_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
+{
+  GFreenectDevice *self = GFREENECT_DEVICE (user_data);
+
+  if (self->priv->tilt_result != NULL)
+    {
+      g_signal_handlers_disconnect_by_func (cancellable,
+                                            on_set_tilt_cancelled,
+                                            user_data);
+
+      g_mutex_lock (self->priv->dispatch_mutex);
+
+      g_simple_async_result_set_error (self->priv->tilt_result,
+                                       G_IO_ERROR,
+                                       G_IO_ERROR_CANCELLED,
+                                       "Tilt operation cancelled");
+      g_simple_async_result_complete_in_idle (self->priv->tilt_result);
+      g_object_unref (self->priv->tilt_result);
+      self->priv->tilt_result = NULL;
+
+      g_mutex_unlock (self->priv->dispatch_mutex);
+    }
 }
 
 /* public methods */
@@ -976,19 +1075,77 @@ gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
 }
 
 void
-gfreenect_device_set_tilt_angle (GFreenectDevice *self, gdouble tilt_angle)
+gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
+                                 gdouble              tilt_angle,
+                                 GCancellable        *cancellable,
+                                 GAsyncReadyCallback  callback,
+                                 gpointer             user_data)
 {
+  GSimpleAsyncResult *res = NULL;
+
   g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  if (callback != NULL)
+    {
+      res = g_simple_async_result_new (G_OBJECT (self),
+                                       callback,
+                                       user_data,
+                                       gfreenect_device_set_tilt_angle);
+
+      if (self->priv->tilt_result != NULL)
+        {
+          g_simple_async_result_set_error (res,
+                                           G_IO_ERROR,
+                                           G_IO_ERROR_PENDING,
+                                           "Tilt operation pending");
+
+          g_simple_async_result_complete_in_idle (res);
+          g_object_unref (res);
+          return;
+        }
+    }
+
+  /* Kinect's motor won't move less than 1 degree, thus we need to add some
+     threshold to avoid waiting forever for the call to complete */
+  if (abs (tilt_angle - self->priv->tilt_angle) <= 1.0)
+    {
+      g_simple_async_result_complete_in_idle (res);
+      g_object_unref (res);
+
+      return;
+    }
 
   if (self->priv->dispatch_thread == NULL)
     launch_dispatch_thread (self, NULL);
 
   g_mutex_lock (self->priv->dispatch_mutex);
 
+  self->priv->tilt_result = res;
+  if (cancellable != NULL)
+    g_signal_connect (cancellable,
+                      "cancelled",
+                      G_CALLBACK (on_set_tilt_cancelled),
+                      self);
+
   self->priv->tilt_angle = tilt_angle;
   self->priv->update_tilt_angle = TRUE;
 
   g_mutex_unlock (self->priv->dispatch_mutex);
+}
+
+gboolean
+gfreenect_device_set_tilt_angle_finish (GFreenectDevice  *self,
+                                        GAsyncResult     *result,
+                                        GError          **error)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
+  g_return_val_if_fail (g_simple_async_result_is_valid (result,
+                                               G_OBJECT (self),
+                                               gfreenect_device_set_tilt_angle),
+                        FALSE);
+
+  return ! g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
+                                                  error);
 }
 
 gdouble

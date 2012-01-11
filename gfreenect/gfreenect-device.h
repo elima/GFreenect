@@ -86,8 +86,15 @@ guint8 *          gfreenect_device_get_video_frame_raw        (GFreenectDevice *
 guint8 *          gfreenect_device_get_depth_frame_grayscale  (GFreenectDevice *self,
                                                                gsize           *len);
 
-void              gfreenect_device_set_tilt_angle             (GFreenectDevice *self,
-                                                               gdouble          tilt_angle);
+void              gfreenect_device_set_tilt_angle             (GFreenectDevice     *self,
+                                                               gdouble              tilt_angle,
+                                                               GCancellable        *cancellable,
+                                                               GAsyncReadyCallback  callback,
+                                                               gpointer             user_data);
+gboolean          gfreenect_device_set_tilt_angle_finish      (GFreenectDevice  *self,
+                                                               GAsyncResult     *result,
+                                                               GError          **error);
+
 gdouble           gfreenect_device_get_tilt_angle             (GFreenectDevice *self);
 
 G_END_DECLS
