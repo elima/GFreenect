@@ -35,31 +35,31 @@ class GFreenectView(Gtk.Window):
         self.connect('delete-event', self._on_delete_event)
         self.set_size_request(800, 600)
 
-        self._contents = Gtk.Box.new(Gtk.Orientation.VERTICAL, 12)
-        self.add(self._contents)
+        contents = Gtk.Box.new(Gtk.Orientation.VERTICAL, 12)
+        self.add(contents)
 
         top_contents = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 12)
-        self._contents.pack_start(top_contents, fill=True, expand=True, padding=0)
+        contents.pack_start(top_contents, fill=True, expand=True, padding=0)
         embed = GtkClutter.Embed.new()
         top_contents.pack_start(embed, fill=True, expand=True, padding=12)
 
-        self.stage = embed.get_stage()
-        self.stage.set_title('GFreenect View')
-        self.stage.set_user_resizable(True)
-        self.stage.set_color(Clutter.Color.new(0, 0, 0, 255))
+        stage = embed.get_stage()
+        stage.set_title('GFreenect View')
+        stage.set_user_resizable(True)
+        stage.set_color(Clutter.Color.new(0, 0, 0, 255))
 
         layout_manager = Clutter.BoxLayout()
         textures_box = Clutter.Box.new(layout_manager)
-        self.stage.add_actor(textures_box)
-        geometry = self.stage.get_geometry()
+        stage.add_actor(textures_box)
+        geometry = stage.get_geometry()
         textures_box.set_geometry(geometry)
-        self.stage.connect('allocation-changed',
-                           self._on_allocation_changed,
-                           textures_box)
+        stage.connect('allocation-changed',
+                      self._on_allocation_changed,
+                      textures_box)
 
         self._tilt_scale_timeout = 0
-        self.tilt_scale = self._create_tilt_scale()
-        top_contents.pack_start(self.tilt_scale, fill=False, expand=False, padding=0)
+        self._tilt_scale = self._create_tilt_scale()
+        top_contents.pack_start(self._tilt_scale, fill=False, expand=False, padding=0)
 
         self.led_combobox = self._create_led_combobox()
         label = Gtk.Label()
@@ -67,7 +67,7 @@ class GFreenectView(Gtk.Window):
         label.set_use_underline(True)
         label.set_mnemonic_widget(self.led_combobox)
         bottom_contents = Gtk.Box(Gtk.Orientation.HORIZONTAL, 12)
-        self._contents.pack_end(bottom_contents, fill=False, expand=False, padding=0)
+        contents.pack_end(bottom_contents, fill=False, expand=False, padding=0)
         bottom_contents.pack_start(label, fill=False, expand=False, padding=12)
         bottom_contents.pack_start(self.led_combobox, fill=False, expand=False, padding=0)
 
@@ -108,13 +108,13 @@ class GFreenectView(Gtk.Window):
             kinect.set_tilt_angle_finish(result)
         except:
             pass
-        self.tilt_scale.set_sensitive(True)
+        self._tilt_scale.set_sensitive(True)
 
     def _on_kinect_ready(self, kinect, result, layout_manager):
         self.kinect = kinect
         success = self.kinect.new_finish(result)
         self.kinect.set_led(GFreenect.Led.GREEN)
-        self.kinect.set_tilt_angle(self.tilt_scale.get_value(),
+        self.kinect.set_tilt_angle(self._tilt_scale.get_value(),
                                    None,
                                    self._on_set_tilt_finish,
                                    None);
@@ -159,8 +159,8 @@ class GFreenectView(Gtk.Window):
         self._tilt_scale_timeout = GObject.timeout_add(500, self._scale_value_changed_timeout)
 
     def _scale_value_changed_timeout(self):
-        self.tilt_scale.set_sensitive(False)
-        self.kinect.set_tilt_angle(self.tilt_scale.get_value(),
+        self._tilt_scale.set_sensitive(False)
+        self.kinect.set_tilt_angle(self._tilt_scale.get_value(),
                                    None,
                                    self._on_set_tilt_finish,
                                    None)
