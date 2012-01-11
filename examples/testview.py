@@ -59,7 +59,18 @@ class GFreenectView(Gtk.Window):
 
         self._tilt_scale_timeout = 0
         self._tilt_scale = self._create_tilt_scale()
-        top_contents.pack_start(self._tilt_scale, fill=False, expand=False, padding=0)
+        top_right_contents = Gtk.Box.new(Gtk.Orientation.VERTICAL, 12)
+        top_contents.pack_start(top_right_contents, fill=False,
+                                expand=False, padding=12)
+        label = Gtk.Label()
+        label.set_label('Tilt _Motor:')
+        label.set_use_underline(True)
+        label.set_mnemonic_widget(self._tilt_scale)
+
+        top_right_contents.pack_start(label, fill=False,
+                                expand=False, padding=0)
+        top_right_contents.pack_start(self._tilt_scale, fill=True,
+                                expand=True, padding=0)
 
         self.led_combobox = self._create_led_combobox()
         label = Gtk.Label()
