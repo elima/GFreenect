@@ -598,6 +598,23 @@ on_video_frame (freenect_device *dev, void *buf, uint32_t timestamp)
 }
 
 static gboolean
+check_cancelled (GCancellable *cancellable, GError **error, const gchar *op_desc)
+{
+  if (cancellable && g_cancellable_is_cancelled (cancellable))
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_CANCELLED,
+                   "%s operation cancelled",
+                   op_desc);
+
+      return FALSE;
+    }
+
+  return TRUE;
+}
+
+static gboolean
 init_sync (GInitable     *initable,
            GCancellable  *cancellable,
            GError       **error)
@@ -613,6 +630,9 @@ init_sync (GInitable     *initable,
       return FALSE;
     }
 
+  if (! check_cancelled (cancellable, error, "Init kinect"))
+    return FALSE;
+
   freenect_select_subdevices (self->priv->ctx, self->priv->subdevices);
 
   if (freenect_open_device (self->priv->ctx,
@@ -625,6 +645,9 @@ init_sync (GInitable     *initable,
                    "Failed to open Kinect device");
       return FALSE;
     }
+
+  if (! check_cancelled (cancellable, error, "Open kinect device"))
+    return FALSE;
 
   freenect_set_user (self->priv->dev, self);
 
