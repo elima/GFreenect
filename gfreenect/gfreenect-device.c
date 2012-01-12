@@ -1356,3 +1356,33 @@ gfreenect_device_get_tilt_angle_finish (GFreenectDevice  *self,
 
   return 0.0;
 }
+
+gdouble
+gfreenect_device_get_tilt_angle_sync (GFreenectDevice  *self,
+                                      GCancellable     *cancellable,
+                                      GError          **error)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), 0.0);
+
+  if (freenect_update_tilt_state (self->priv->dev) == -1)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to update tilt state");
+
+      return 0.0;
+    }
+  else if (! check_cancelled (cancellable, error, "Get tilt"))
+    {
+      return 0.0;
+    }
+  else
+    {
+      freenect_raw_tilt_state *state = NULL;
+
+      state = freenect_get_tilt_state (self->priv->dev);
+
+      return freenect_get_tilt_degs (state);
+    }
+}

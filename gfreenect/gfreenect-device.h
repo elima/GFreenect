@@ -103,6 +103,10 @@ gdouble           gfreenect_device_get_tilt_angle_finish      (GFreenectDevice  
                                                                GAsyncResult     *result,
                                                                GError          **error);
 
+gdouble           gfreenect_device_get_tilt_angle_sync        (GFreenectDevice  *self,
+                                                               GCancellable     *cancellable,
+                                                               GError          **error);
+
 G_END_DECLS
 
 #endif /* __GFREENECT_DEVICE_H__ */
