@@ -1416,3 +1416,45 @@ gfreenect_device_get_tilt_angle_sync (GFreenectDevice  *self,
       return freenect_get_tilt_degs (state);
     }
 }
+
+/**
+ * gfreenect_device_get_accel_sync
+ * @x: (out) (allow-none):
+ * @y: (out) (allow-none):
+ * @z: (out) (allow-none):
+ * @cancellable: (allow-none):
+ *
+ * Return value: %TRUE on success, %FALSE on failure
+ *
+ **/
+gboolean
+gfreenect_device_get_accel_sync (GFreenectDevice  *self,
+                                 gdouble          *x,
+                                 gdouble          *y,
+                                 gdouble          *z,
+                                 GCancellable     *cancellable,
+                                 GError          **error)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
+
+  if (freenect_update_tilt_state (self->priv->dev) == -1)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to update tilt state");
+    }
+  else if (!check_cancelled (cancellable, error, "Get MKS acceleration"))
+    {
+      freenect_raw_tilt_state *state = NULL;
+
+      state = freenect_get_tilt_state (self->priv->dev);
+      *x = state->accelerometer_x;
+      *y = state->accelerometer_y;
+      *z = state->accelerometer_z;
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
