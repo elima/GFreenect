@@ -656,6 +656,10 @@ init_sync (GInitable     *initable,
 
   self->priv->user_buf = g_slice_alloc (USER_BUF_SIZE);
 
+  self->priv->tilt_angle = gfreenect_device_get_tilt_angle_sync (self,
+                                                                 cancellable,
+                                                                 error);
+
   return TRUE;
 }
 
