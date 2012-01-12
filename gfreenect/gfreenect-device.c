@@ -534,7 +534,11 @@ on_depth_frame (freenect_device *dev, void *depth, uint32_t timestamp)
 
   self->priv->got_depth_frame = TRUE;
 
-  memcpy (self->priv->depth_buf, depth, self->priv->depth_mode.bytes);
+  if (freenect_set_depth_buffer (self->priv->dev, self->priv->depth_buf) != 0)
+    {
+      /* @TODO: report this error */
+      g_warning ("Failed to set depth buffer");
+    }
 
   if (self->priv->depth_frame_src_id == 0)
     {
@@ -583,7 +587,11 @@ on_video_frame (freenect_device *dev, void *buf, uint32_t timestamp)
 
   self->priv->got_video_frame = TRUE;
 
-  memcpy (self->priv->video_buf, buf, self->priv->video_mode.bytes);
+  if (freenect_set_video_buffer (self->priv->dev, self->priv->video_buf) != 0)
+    {
+      /* @TODO: report this error */
+      g_warning ("Failed to set video buffer");
+    }
 
   if (self->priv->video_frame_src_id == 0)
     {
@@ -1065,6 +1073,15 @@ gfreenect_device_start_depth_stream (GFreenectDevice *self, GError **error)
       return FALSE;
     }
 
+  if (freenect_set_depth_buffer (self->priv->dev, self->priv->depth_buf) != 0)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to set depth buffer");
+      return FALSE;
+    }
+
   self->priv->depth_buf = g_slice_alloc (self->priv->depth_mode.bytes);
   self->priv->got_depth_frame = FALSE;
 
@@ -1112,6 +1129,18 @@ gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
       return FALSE;
     }
 
+  if (freenect_set_video_buffer (self->priv->dev, self->priv->video_buf) != 0)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to set video buffer");
+      return FALSE;
+    }
+
+  self->priv->video_buf = g_slice_alloc (self->priv->video_mode.bytes);
+  self->priv->got_video_frame = FALSE;
+
   if (freenect_start_video (self->priv->dev) != 0)
     {
       g_set_error (error,
@@ -1120,9 +1149,6 @@ gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
                    "Failed to start video stream");
       return FALSE;
     }
-
-  self->priv->video_buf = g_slice_alloc (self->priv->video_mode.bytes);
-  self->priv->got_video_frame = FALSE;
 
   if (self->priv->stream_thread == NULL)
     return launch_stream_thread (self, error);
