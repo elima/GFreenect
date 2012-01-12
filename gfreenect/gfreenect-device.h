@@ -95,7 +95,13 @@ gboolean          gfreenect_device_set_tilt_angle_finish      (GFreenectDevice  
                                                                GAsyncResult     *result,
                                                                GError          **error);
 
-gdouble           gfreenect_device_get_tilt_angle             (GFreenectDevice *self);
+void              gfreenect_device_get_tilt_angle             (GFreenectDevice     *self,
+                                                               GCancellable        *cancellable,
+                                                               GAsyncReadyCallback  callback,
+                                                               gpointer             user_data);
+gdouble           gfreenect_device_get_tilt_angle_finish      (GFreenectDevice  *self,
+                                                               GAsyncResult     *result,
+                                                               GError          **error);
 
 G_END_DECLS
 
