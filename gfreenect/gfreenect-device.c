@@ -275,6 +275,7 @@ gfreenect_device_dispose (GObject *obj)
 {
   GFreenectDevice *self = GFREENECT_DEVICE (obj);
 
+  /* stop stream thread */
   if (self->priv->stream_thread != NULL)
     {
       g_mutex_lock (self->priv->stream_mutex);
@@ -299,6 +300,7 @@ gfreenect_device_dispose (GObject *obj)
       g_mutex_unlock (self->priv->stream_mutex);
     }
 
+  /* stop dispatch thread */
   if (self->priv->dispatch_thread != NULL)
     {
       g_mutex_lock (self->priv->dispatch_mutex);
