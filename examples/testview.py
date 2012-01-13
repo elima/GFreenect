@@ -73,6 +73,16 @@ class GFreenectView(Gtk.Window):
         top_right_contents.pack_start(self._tilt_scale, fill=True,
                                 expand=True, padding=0)
 
+        middle_contents = Gtk.Box(Gtk.Orientation.HORIZONTAL, 12)
+        contents.pack_start(middle_contents, fill=False, expand=False, padding=0)
+
+        self.rgb_format_radio = Gtk.RadioButton.new_with_label(None, 'RGB Format')
+        self.rgb_format_radio.connect('toggled', self._on_video_format_radio_clicked)
+        self.ir_format_radio = Gtk.RadioButton.new_from_widget(self.rgb_format_radio)
+        self.ir_format_radio.set_label('IR Format')
+        middle_contents.pack_start(self.rgb_format_radio, fill=False, expand=False, padding=12)
+        middle_contents.pack_start(self.ir_format_radio, fill=False, expand=False, padding=0)
+
         self.led_combobox = self._create_led_combobox()
         label = Gtk.Label()
         label.set_text('_LED:')
@@ -238,6 +248,15 @@ class GFreenectView(Gtk.Window):
         if self._accel_timeout > 0:
             GObject.source_remove(self._accel_timeout)
         self._accel_timeout = GObject.timeout_add(250, self._get_accel)
+
+    def _on_video_format_radio_clicked(self, rgb_radio):
+        self.kinect.stop_video_stream()
+        if rgb_radio.get_active():
+            video_format = GFreenect.VideoFormat.RGB
+        else:
+            video_format = GFreenect.VideoFormat.IR_8BIT
+        self.kinect.start_video_stream(GFreenect.Resolution.MEDIUM,
+                                       video_format)
 
     def _on_delete_event(self, window, event):
         if self.kinect:
