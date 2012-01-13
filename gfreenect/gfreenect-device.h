@@ -28,6 +28,8 @@
 
 #include <gfreenect-decls.h>
 
+#include <gfreenect-frame-mode.h>
+
 G_BEGIN_DECLS
 
 typedef struct _GFreenectDevice GFreenectDevice;
@@ -91,6 +93,10 @@ guint8 *          gfreenect_device_get_video_frame_raw        (GFreenectDevice *
 
 guint8 *          gfreenect_device_get_depth_frame_grayscale  (GFreenectDevice *self,
                                                                gsize           *len);
+
+guint8 *          gfreenect_device_get_video_frame_rgb        (GFreenectDevice    *self,
+                                                               gsize              *len,
+                                                               GFreenectFrameMode *frame_mode);
 
 void              gfreenect_device_set_tilt_angle             (GFreenectDevice     *self,
                                                                gdouble              tilt_angle,

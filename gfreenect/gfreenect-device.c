@@ -1316,6 +1316,74 @@ gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
 }
 
 /**
+ * gfreenect_device_get_video_frame_rgb:
+ * @len: (out) (allow-none):
+ * @frame_mode: (out) (transfer none) (allow-none):
+ *
+ * Returns: (array length=len) (element-type guint8) (transfer none):
+ **/
+guint8 *
+gfreenect_device_get_video_frame_rgb (GFreenectDevice    *self,
+                                      gsize              *len,
+                                      GFreenectFrameMode *frame_mode)
+{
+  guint8 *rgb_buf;
+  gint i;
+  guint8 *data;
+  gsize pixels;
+
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), NULL);
+
+  if (frame_mode != NULL)
+    {
+      gfreenect_frame_mode_set_from_native (frame_mode, &self->priv->video_mode);
+
+      frame_mode->video_format = self->priv->video_format;
+
+      frame_mode->bits_per_pixel = 24;
+      frame_mode->padding_bits_per_pixel = 0;
+
+      frame_mode->length = frame_mode->width * frame_mode->height * 3;
+    }
+
+  switch (self->priv->video_mode.video_format)
+    {
+    case FREENECT_VIDEO_YUV_RGB:
+    case FREENECT_VIDEO_RGB:
+      rgb_buf = gfreenect_device_get_video_frame_raw (self, len);
+      break;
+
+    case FREENECT_VIDEO_IR_8BIT:
+      {
+        rgb_buf = (guint8 *) self->priv->user_buf;
+
+        data = self->priv->video_buf;
+
+        pixels = self->priv->video_mode.width * self->priv->video_mode.height;
+
+        for (i=0; i < pixels; i++)
+          {
+            rgb_buf[i * 3 + 0] = data[i];
+            rgb_buf[i * 3 + 1] = data[i];
+            rgb_buf[i * 3 + 2] = data[i];
+          }
+
+        if (len != NULL)
+          *len = pixels * 3;
+
+        break;
+      }
+
+    default:
+      /* @TODO: not implemented */
+      rgb_buf = NULL;
+      break;
+    }
+
+  return rgb_buf;
+}
+
+/**
  * gfreenect_device_set_tilt_angle:
  * @cancellable: (allow-none):
  * @callback: (scope async):
