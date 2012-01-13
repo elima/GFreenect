@@ -1117,7 +1117,7 @@ gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
 
-  /* free current depth buffer */
+  /* free current video buffer */
   if (self->priv->video_buf != NULL)
     {
       g_slice_free1 (self->priv->video_mode.bytes, self->priv->video_buf);
