@@ -83,6 +83,17 @@ class GFreenectView(Gtk.Window):
         bottom_contents.pack_start(label, fill=False, expand=False, padding=12)
         bottom_contents.pack_start(self.led_combobox, fill=False, expand=False, padding=0)
 
+        self._accel_timeout = 0
+        self._accel_x_label = Gtk.Label()
+        self._accel_y_label = Gtk.Label()
+        self._accel_z_label = Gtk.Label()
+        label = Gtk.Label()
+        label.set_text('Accelerometer:')
+        bottom_contents.pack_start(label, fill=False, expand=False, padding=0)
+        bottom_contents.pack_start(self._accel_x_label, fill=False, expand=False, padding=6)
+        bottom_contents.pack_start(self._accel_y_label, fill=False, expand=False, padding=6)
+        bottom_contents.pack_start(self._accel_z_label, fill=False, expand=False, padding=6)
+
         self.kinect = None
         GFreenect.Device.new(0,
                              GFreenect.Subdevice.ALL,
@@ -147,6 +158,8 @@ class GFreenectView(Gtk.Window):
         self.kinect.start_depth_stream()
         self.kinect.start_video_stream()
 
+        self._get_accel()
+
         self.depth_texture = Clutter.Texture.new()
         self.depth_texture.set_keep_aspect_ratio(True)
         self.video_texture = Clutter.Texture.new()
@@ -200,6 +213,19 @@ class GFreenectView(Gtk.Window):
                                  Gtk.MessageType.ERROR,
                                  Gtk.ButtonsType.CLOSE,
                                  message)
+
+    def _get_accel(self):
+        self.kinect.get_accel(None, self._on_accel_finish, None)
+
+    def _on_accel_finish(self, kinect, result, user_data):
+        success, x, y, z = kinect.get_accel_finish(result)
+        if success:
+            self._accel_x_label.set_markup('<b>X:</b> %s' % x)
+            self._accel_y_label.set_markup('<b>Y:</b> %s' % y)
+            self._accel_z_label.set_markup('<b>Z:</b> %s' % z)
+        if self._accel_timeout > 0:
+            GObject.source_remove(self._accel_timeout)
+        self._accel_timeout = GObject.timeout_add(250, self._get_accel)
 
     def _on_delete_event(self, window, event):
         if self.kinect:
