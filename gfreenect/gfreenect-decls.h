@@ -23,6 +23,8 @@
 #ifndef __GFREENECT_DECLS_H__
 #define __GFREENECT_DECLS_H__
 
+#include <glib.h>
+
 typedef enum
 {
   GFREENECT_SUBDEVICE_MOTOR  = 0x01,
