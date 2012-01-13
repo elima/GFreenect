@@ -38,16 +38,14 @@ typedef enum
 typedef enum {
   GFREENECT_RESOLUTION_LOW    = 0,
   GFREENECT_RESOLUTION_MEDIUM = 1,
-  GFREENECT_RESOLUTION_HIGH   = 2,
-  GFREENECT_RESOLUTION_DUMMY  = G_MAXUINT32
+  GFREENECT_RESOLUTION_HIGH   = 2
 } GFreenectResolution;
 
 typedef enum {
   GFREENECT_DEPTH_FORMAT_11BIT         = 0,
   GFREENECT_DEPTH_FORMAT_10BIT         = 1,
   GFREENECT_DEPTH_FORMAT_11BIT_PACKED  = 2,
-  GFREENECT_DEPTH_FORMAT_10BIT_PACKED  = 3,
-  GFREENECT_DEPTH_FORMAT_DUMMY         = G_MAXUINT32
+  GFREENECT_DEPTH_FORMAT_10BIT_PACKED  = 3
 } GFreenectDepthFormat;
 
 typedef enum {
@@ -57,8 +55,7 @@ typedef enum {
   GFREENECT_VIDEO_FORMAT_IR_10BIT        = 3, /**< 10-bit IR mode */
   GFREENECT_VIDEO_FORMAT_IR_10BIT_PACKED = 4, /**< 10-bit packed IR mode */
   GFREENECT_VIDEO_FORMAT_YUV_RGB         = 5, /**< YUV RGB mode */
-  GFREENECT_VIDEO_FORMAT_YUV_RAW         = 6, /**< YUV Raw mode */
-  GFREENECT_VIDEO_FORMAT_DUMMY           = G_MAXUINT32, /**< Dummy value to force enum to be 32 bits wide */
+  GFREENECT_VIDEO_FORMAT_YUV_RAW         = 6 /**< YUV Raw mode */
 } GFreenectVideoFormat;
 
 typedef enum {
