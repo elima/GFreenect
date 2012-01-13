@@ -897,14 +897,10 @@ static gpointer
 stream_thread_func (gpointer _data)
 {
   GFreenectDevice *self = GFREENECT_DEVICE (_data);
-  gboolean abort = FALSE;
 
-  while (! abort)
+  while (! self->priv->abort_stream_thread)
     {
       freenect_process_events (self->priv->ctx);
-
-      if (self->priv->abort_stream_thread)
-        abort = TRUE;
     }
 
   return NULL;
