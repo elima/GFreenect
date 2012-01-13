@@ -543,10 +543,7 @@ on_depth_frame (freenect_device *dev, void *depth, uint32_t timestamp)
   self->priv->got_depth_frame = TRUE;
 
   if (freenect_set_depth_buffer (self->priv->dev, self->priv->depth_buf) != 0)
-    {
-      /* @TODO: report this error */
-      g_warning ("Failed to set depth buffer");
-    }
+    g_warning ("Failed to set depth buffer");
 
   if (self->priv->depth_frame_src_id == 0)
     {
@@ -596,10 +593,7 @@ on_video_frame (freenect_device *dev, void *buf, uint32_t timestamp)
   self->priv->got_video_frame = TRUE;
 
   if (freenect_set_video_buffer (self->priv->dev, self->priv->video_buf) != 0)
-    {
-      /* @TODO: report this error */
-      g_warning ("Failed to set video buffer");
-    }
+    g_warning ("Failed to set video buffer");
 
   if (self->priv->video_frame_src_id == 0)
     {
@@ -1531,7 +1525,7 @@ gfreenect_device_get_accel (GFreenectDevice     *self,
 }
 
 /**
- * gfreenect_device_get_accel_finish
+ * gfreenect_device_get_accel_finish:
  * @x: (out) (allow-none):
  * @y: (out) (allow-none):
  * @z: (out) (allow-none):
@@ -1572,14 +1566,13 @@ gfreenect_device_get_accel_finish (GFreenectDevice  *self,
 }
 
 /**
- * gfreenect_device_get_accel_sync
+ * gfreenect_device_get_accel_sync:
  * @x: (out) (allow-none):
  * @y: (out) (allow-none):
  * @z: (out) (allow-none):
  * @cancellable: (allow-none):
  *
  * Return value: %TRUE on success, %FALSE on failure
- *
  **/
 gboolean
 gfreenect_device_get_accel_sync (GFreenectDevice  *self,
