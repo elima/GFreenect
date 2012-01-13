@@ -73,7 +73,10 @@ gboolean          gfreenect_device_start_depth_stream         (GFreenectDevice  
 gboolean          gfreenect_device_start_video_stream         (GFreenectDevice  *self,
                                                                GError          **error);
 
-gboolean          gfreenect_device_stop_depth_stream          (GFreenectDevice  *self);
+gboolean          gfreenect_device_stop_depth_stream          (GFreenectDevice  *self,
+                                                               GError          **error);
+gboolean          gfreenect_device_stop_video_stream          (GFreenectDevice  *self,
+                                                               GError          **error);
 
 void              gfreenect_device_set_led                    (GFreenectDevice *self,
                                                                GFreenectLed     led);

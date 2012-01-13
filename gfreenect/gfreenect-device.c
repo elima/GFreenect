@@ -70,6 +70,9 @@ struct _GFreenectDevicePrivate
   guint depth_frame_src_id;
   guint video_frame_src_id;
 
+  gboolean depth_stream_started;
+  gboolean video_stream_started;
+
   void *user_buf;
 
   void *depth_buf;
@@ -268,6 +271,9 @@ gfreenect_device_init (GFreenectDevice *self)
   priv->tilt_motor_moving = FALSE;
 
   priv->state_dependent_results = NULL;
+
+  priv->depth_stream_started = FALSE;
+  priv->video_stream_started = FALSE;
 }
 
 static void
@@ -1048,9 +1054,19 @@ gfreenect_device_new_finish (GAsyncResult *result, GError **error)
 }
 
 gboolean
-gfreenect_device_start_depth_stream (GFreenectDevice *self, GError **error)
+gfreenect_device_start_depth_stream (GFreenectDevice       *self,
+                                     GError               **error)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
+
+  if (self->priv->depth_stream_started)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_PENDING,
+                   "Depth stream already started, try stopping it first");
+      return FALSE;
+    }
 
   /* free current depth buffer */
   if (self->priv->depth_buf != NULL)
@@ -1092,30 +1108,52 @@ gfreenect_device_start_depth_stream (GFreenectDevice *self, GError **error)
   self->priv->depth_buf = g_slice_alloc (self->priv->depth_mode.bytes);
   self->priv->got_depth_frame = FALSE;
 
-  if (self->priv->stream_thread == NULL)
-    return launch_stream_thread (self, error);
-  else
-    return TRUE;
-}
 
-gboolean
-gfreenect_device_stop_depth_stream (GFreenectDevice *self)
-{
-  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+  if (self->priv->stream_thread == NULL && ! launch_stream_thread (self, error))
+    return FALSE;
 
-  if (freenect_stop_depth (self->priv->dev) != 0)
-    {
-      g_warning ("Failed to stop depth stream");
-      return FALSE;
-    }
+  self->priv->depth_stream_started = TRUE;
 
   return TRUE;
 }
 
 gboolean
-gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
+gfreenect_device_stop_depth_stream (GFreenectDevice  *self,
+                                    GError          **error)
+{
+  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  if (freenect_stop_depth (self->priv->dev) != 0)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to stop depth stream");
+      return FALSE;
+    }
+
+  self->priv->depth_stream_started = FALSE;
+
+  if (! self->priv->video_stream_started)
+    self->priv->abort_stream_thread = TRUE;
+
+  return TRUE;
+}
+
+gboolean
+gfreenect_device_start_video_stream (GFreenectDevice  *self,
+                                     GError          **error)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
+
+  if (self->priv->video_stream_started)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_PENDING,
+                   "Depth stream already started, try stopping it first");
+      return FALSE;
+    }
 
   /* free current video buffer */
   if (self->priv->video_buf != NULL)
@@ -1157,10 +1195,35 @@ gfreenect_device_start_video_stream (GFreenectDevice *self, GError **error)
       return FALSE;
     }
 
-  if (self->priv->stream_thread == NULL)
-    return launch_stream_thread (self, error);
-  else
-    return TRUE;
+  if (self->priv->stream_thread == NULL && ! launch_stream_thread (self, error))
+    return FALSE;
+
+  self->priv->video_stream_started = TRUE;
+
+  return TRUE;
+}
+
+gboolean
+gfreenect_device_stop_video_stream (GFreenectDevice  *self,
+                                    GError          **error)
+{
+  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  if (freenect_stop_video (self->priv->dev) != 0)
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to stop video stream");
+      return FALSE;
+    }
+
+  self->priv->video_stream_started = FALSE;
+
+  if (! self->priv->depth_stream_started)
+    self->priv->abort_stream_thread = TRUE;
+
+  return TRUE;
 }
 
 void
