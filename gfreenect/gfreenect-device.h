@@ -107,6 +107,18 @@ gdouble           gfreenect_device_get_tilt_angle_sync        (GFreenectDevice  
                                                                GCancellable     *cancellable,
                                                                GError          **error);
 
+void              gfreenect_device_get_accel                  (GFreenectDevice     *self,
+                                                               GCancellable        *cancellable,
+                                                               GAsyncReadyCallback  callback,
+                                                               gpointer             user_data);
+gboolean          gfreenect_device_get_accel_finish           (GFreenectDevice  *self,
+                                                               gdouble          *x,
+                                                               gdouble          *y,
+                                                               gdouble          *z,
+                                                               GAsyncResult     *result,
+                                                               GError          **error);
+
+
 gboolean          gfreenect_device_get_accel_sync             (GFreenectDevice  *self,
                                                                gdouble          *x,
                                                                gdouble          *y,

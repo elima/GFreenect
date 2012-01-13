@@ -1427,6 +1427,84 @@ gfreenect_device_get_tilt_angle_sync (GFreenectDevice  *self,
 }
 
 /**
+ * gfreenect_device_get_accel:
+ * @cancellable: (allow-none):
+ * @callback: (scope async):
+ * @user_data: (allow-none)
+ *
+ **/
+void
+gfreenect_device_get_accel (GFreenectDevice     *self,
+                            GCancellable        *cancellable,
+                            GAsyncReadyCallback  callback,
+                            gpointer             user_data)
+{
+  GSimpleAsyncResult *res;
+
+  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  res = g_simple_async_result_new (G_OBJECT (self),
+                                   callback,
+                                   user_data,
+                                   gfreenect_device_get_accel);
+
+  if (cancellable != NULL)
+    g_signal_connect (cancellable,
+                      "cancelled",
+                      G_CALLBACK (on_get_tilt_cancelled),
+                      res);
+
+  g_mutex_lock (self->priv->dispatch_mutex);
+
+  self->priv->state_dependent_results =
+                        g_list_append (self->priv->state_dependent_results,
+                                       res);
+
+  g_mutex_unlock (self->priv->dispatch_mutex);
+}
+
+/**
+ * gfreenect_device_get_accel_finish
+ * @x: (out) (allow-none):
+ * @y: (out) (allow-none):
+ * @z: (out) (allow-none):
+ *
+ * Return value: %TRUE on success, %FALSE on failure
+ *
+ **/
+gboolean
+gfreenect_device_get_accel_finish (GFreenectDevice  *self,
+                                   gdouble          *x,
+                                   gdouble          *y,
+                                   gdouble          *z,
+                                   GAsyncResult     *result,
+                                   GError          **error)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), 0.0);
+  g_return_val_if_fail (g_simple_async_result_is_valid (result,
+                                              G_OBJECT (self),
+                                              gfreenect_device_get_accel),
+                        FALSE);
+
+  if (! g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
+                                               error))
+    {
+      freenect_raw_tilt_state *state = NULL;
+
+      state =
+        g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (result));
+
+      *x = state->accelerometer_x;
+      *y = state->accelerometer_y;
+      *z = state->accelerometer_z;
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+/**
  * gfreenect_device_get_accel_sync
  * @x: (out) (allow-none):
  * @y: (out) (allow-none):
