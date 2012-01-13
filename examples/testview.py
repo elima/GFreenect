@@ -155,8 +155,19 @@ class GFreenectView(Gtk.Window):
         self.kinect.connect("video-frame",
                             self._on_video_frame,
                             None)
-        self.kinect.start_depth_stream()
-        self.kinect.start_video_stream()
+
+        try:
+            self.kinect.start_depth_stream(getattr(GFreenect.DepthFormat, '11BIT'))
+        except Exception, e:
+            print e.message
+            Gtk.main_quit()
+
+        try:
+            self.kinect.start_video_stream(GFreenect.Resolution.MEDIUM,
+                                           GFreenect.VideoFormat.RGB)
+        except Exception, e:
+            print e.message
+            Gtk.main_quit()
 
         self._get_accel()
 
