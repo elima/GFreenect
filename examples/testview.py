@@ -190,9 +190,10 @@ class GFreenectView(Gtk.Window):
                                              640, 480, 0, 3, 0)
 
     def _on_video_frame(self, kinect, user_data):
-        data = kinect.get_video_frame_raw()
+        data, frame_mode = kinect.get_video_frame_rgb()
         self.video_texture.set_from_rgb_data(data, False,
-                                             640, 480, 0, 3, 0)
+                                             frame_mode.width, frame_mode.height,
+                                             0, frame_mode.bits_per_pixel / 8, 0)
 
     def _on_allocation_changed(self, actor, box, flags, textures_box):
         textures_box.set_geometry(actor.get_geometry())
