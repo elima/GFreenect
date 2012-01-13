@@ -34,11 +34,13 @@ lib_LTLIBRARIES = lib@PRJ_API_NAME@.la
 
 # libgfreenect
 source_c = \
+	gfreenect-frame-mode.c \
 	gfreenect-device.c
 
 source_h = \
 	gfreenect.h \
 	gfreenect-decls.h \
+	gfreenect-frame-mode.h \
 	gfreenect-device.h
 
 source_h_priv =
