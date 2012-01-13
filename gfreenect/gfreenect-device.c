@@ -1055,6 +1055,7 @@ gfreenect_device_new_finish (GAsyncResult *result, GError **error)
 
 gboolean
 gfreenect_device_start_depth_stream (GFreenectDevice       *self,
+                                     GFreenectDepthFormat   format,
                                      GError               **error)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
@@ -1067,6 +1068,8 @@ gfreenect_device_start_depth_stream (GFreenectDevice       *self,
                    "Depth stream already started, try stopping it first");
       return FALSE;
     }
+
+  self->priv->depth_format = format;
 
   /* free current depth buffer */
   if (self->priv->depth_buf != NULL)
@@ -1141,8 +1144,10 @@ gfreenect_device_stop_depth_stream (GFreenectDevice  *self,
 }
 
 gboolean
-gfreenect_device_start_video_stream (GFreenectDevice  *self,
-                                     GError          **error)
+gfreenect_device_start_video_stream (GFreenectDevice      *self,
+                                     GFreenectResolution   resolution,
+                                     GFreenectVideoFormat  format,
+                                     GError               **error)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
 
@@ -1154,6 +1159,9 @@ gfreenect_device_start_video_stream (GFreenectDevice  *self,
                    "Depth stream already started, try stopping it first");
       return FALSE;
     }
+
+  self->priv->video_resolution = resolution;
+  self->priv->video_format = format;
 
   /* free current video buffer */
   if (self->priv->video_buf != NULL)

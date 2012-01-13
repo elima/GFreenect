@@ -68,10 +68,13 @@ void              gfreenect_device_new                        (gint             
 GFreenectDevice * gfreenect_device_new_finish                 (GAsyncResult  *result,
                                                                GError       **error);
 
-gboolean          gfreenect_device_start_depth_stream         (GFreenectDevice  *self,
-                                                               GError          **error);
-gboolean          gfreenect_device_start_video_stream         (GFreenectDevice  *self,
-                                                               GError          **error);
+gboolean          gfreenect_device_start_depth_stream         (GFreenectDevice       *self,
+                                                               GFreenectDepthFormat   format,
+                                                               GError               **error);
+gboolean          gfreenect_device_start_video_stream         (GFreenectDevice      *self,
+                                                               GFreenectResolution   resolution,
+                                                               GFreenectVideoFormat  format,
+                                                               GError               **error);
 
 gboolean          gfreenect_device_stop_depth_stream          (GFreenectDevice  *self,
                                                                GError          **error);
