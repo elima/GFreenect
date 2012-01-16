@@ -84,7 +84,7 @@ struct _GFreenectDevicePrivate
   gboolean update_tilt_angle;
   gboolean update_led;
 
-  GSimpleAsyncResult *set_state_dependent_result;
+  GSimpleAsyncResult *set_tilt_result;
   GList *state_dependent_results;
 };
 
@@ -267,7 +267,7 @@ gfreenect_device_init (GFreenectDevice *self)
   priv->video_resolution = DEFAULT_VIDEO_RESOLUTION;
   priv->video_format = DEFAULT_VIDEO_FORMAT;
 
-  priv->set_state_dependent_result = NULL;
+  priv->set_tilt_result = NULL;
   priv->tilt_motor_moving = FALSE;
 
   priv->state_dependent_results = NULL;
@@ -320,19 +320,19 @@ gfreenect_device_dispose (GObject *obj)
     }
 
   /* cancel pending state dependent operation */
-  if (self->priv->set_state_dependent_result != NULL)
+  if (self->priv->set_tilt_result != NULL)
     {
       g_mutex_lock (self->priv->dispatch_mutex);
 
-      g_simple_async_result_set_error (self->priv->set_state_dependent_result,
+      g_simple_async_result_set_error (self->priv->set_tilt_result,
                                        G_IO_ERROR,
                                        G_IO_ERROR_CANCELLED,
                                        "State dependent operation cancelled "
                                        "upon device disposal");
 
-      g_simple_async_result_complete (self->priv->set_state_dependent_result);
-      g_object_unref (self->priv->set_state_dependent_result);
-      self->priv->set_state_dependent_result = NULL;
+      g_simple_async_result_complete (self->priv->set_tilt_result);
+      g_object_unref (self->priv->set_tilt_result);
+      self->priv->set_tilt_result = NULL;
 
       g_mutex_unlock (self->priv->dispatch_mutex);
     }
@@ -767,7 +767,7 @@ dispatch_thread_func (gpointer _data)
         }
 
       /* whether to update tilt state */
-      if (self->priv->set_state_dependent_result != NULL ||
+      if (self->priv->set_tilt_result != NULL ||
           self->priv->state_dependent_results != NULL)
         {
           update_tilt_failed = FALSE;
@@ -779,21 +779,21 @@ dispatch_thread_func (gpointer _data)
         }
 
       /* check tilt motor status */
-      if (self->priv->set_state_dependent_result != NULL)
+      if (self->priv->set_tilt_result != NULL)
         {
           if (update_tilt_failed)
             {
               /* complete the 'set-tilt' operation with error */
               g_mutex_lock (self->priv->dispatch_mutex);
 
-              g_simple_async_result_set_error (self->priv->set_state_dependent_result,
+              g_simple_async_result_set_error (self->priv->set_tilt_result,
                                                G_IO_ERROR,
                                                G_IO_ERROR_FAILED,
                                                "Failed to obtain state");
               g_simple_async_result_complete_in_idle (
-                                        self->priv->set_state_dependent_result);
-              g_object_unref (self->priv->set_state_dependent_result);
-              self->priv->set_state_dependent_result = NULL;
+                                        self->priv->set_tilt_result);
+              g_object_unref (self->priv->set_tilt_result);
+              self->priv->set_tilt_result = NULL;
 
               g_mutex_unlock (self->priv->dispatch_mutex);
             }
@@ -808,9 +808,9 @@ dispatch_thread_func (gpointer _data)
                   self->priv->tilt_motor_moving = FALSE;
 
                   g_simple_async_result_complete_in_idle (
-                                        self->priv->set_state_dependent_result);
-                  g_object_unref (self->priv->set_state_dependent_result);
-                  self->priv->set_state_dependent_result = NULL;
+                                        self->priv->set_tilt_result);
+                  g_object_unref (self->priv->set_tilt_result);
+                  self->priv->set_tilt_result = NULL;
 
                   g_mutex_unlock (self->priv->dispatch_mutex);
                 }
@@ -936,22 +936,21 @@ on_set_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
 {
   GFreenectDevice *self = GFREENECT_DEVICE (user_data);
 
-  if (self->priv->set_state_dependent_result != NULL)
+  if (self->priv->set_tilt_result != NULL)
     {
       g_signal_handlers_disconnect_by_func (cancellable,
                                             on_set_tilt_cancelled,
                                             user_data);
 
       g_mutex_lock (self->priv->dispatch_mutex);
-
-      g_simple_async_result_set_error (self->priv->set_state_dependent_result,
+      g_simple_async_result_set_error (self->priv->set_tilt_result,
                                        G_IO_ERROR,
                                        G_IO_ERROR_CANCELLED,
                                        "Set tilt angle operation cancelled");
       g_simple_async_result_complete_in_idle (
-                                        self->priv->set_state_dependent_result);
-      g_object_unref (self->priv->set_state_dependent_result);
-      self->priv->set_state_dependent_result = NULL;
+                                        self->priv->set_tilt_result);
+      g_object_unref (self->priv->set_tilt_result);
+      self->priv->set_tilt_result = NULL;
 
       g_mutex_unlock (self->priv->dispatch_mutex);
     }
@@ -1407,7 +1406,7 @@ gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
                                        user_data,
                                        gfreenect_device_set_tilt_angle);
 
-      if (self->priv->set_state_dependent_result != NULL)
+      if (self->priv->set_tilt_result != NULL)
         {
           g_simple_async_result_set_error (res,
                                            G_IO_ERROR,
@@ -1435,7 +1434,7 @@ gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
 
   g_mutex_lock (self->priv->dispatch_mutex);
 
-  self->priv->set_state_dependent_result = res;
+  self->priv->set_tilt_result = res;
   if (cancellable != NULL)
     g_signal_connect (cancellable,
                       "cancelled",
