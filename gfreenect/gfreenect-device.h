@@ -83,8 +83,14 @@ gboolean          gfreenect_device_stop_depth_stream          (GFreenectDevice  
 gboolean          gfreenect_device_stop_video_stream          (GFreenectDevice  *self,
                                                                GError          **error);
 
-void              gfreenect_device_set_led                    (GFreenectDevice *self,
-                                                               GFreenectLed     led);
+void              gfreenect_device_set_led                    (GFreenectDevice     *self,
+                                                               GFreenectLed         led,
+                                                               GCancellable        *cancellable,
+                                                               GAsyncReadyCallback  callback,
+                                                               gpointer             user_data);
+gboolean          gfreenect_device_set_led_finish             (GFreenectDevice  *self,
+                                                               GAsyncResult     *result,
+                                                               GError          **error);
 
 guint8 *          gfreenect_device_get_depth_frame_raw        (GFreenectDevice    *self,
                                                                gsize              *len,

@@ -85,6 +85,7 @@ struct _GFreenectDevicePrivate
   gboolean update_led;
 
   GSimpleAsyncResult *set_tilt_result;
+  GSimpleAsyncResult *set_led_result;
   GList *state_dependent_results;
 };
 
@@ -268,6 +269,7 @@ gfreenect_device_init (GFreenectDevice *self)
   priv->video_format = DEFAULT_VIDEO_FORMAT;
 
   priv->set_tilt_result = NULL;
+  priv->set_led_result = NULL;
   priv->tilt_motor_moving = FALSE;
 
   priv->state_dependent_results = NULL;
@@ -319,7 +321,7 @@ gfreenect_device_dispose (GObject *obj)
       g_mutex_unlock (self->priv->dispatch_mutex);
     }
 
-  /* cancel pending state dependent operation */
+  /* cancel set tilt angle operation */
   if (self->priv->set_tilt_result != NULL)
     {
       g_mutex_lock (self->priv->dispatch_mutex);
@@ -327,12 +329,30 @@ gfreenect_device_dispose (GObject *obj)
       g_simple_async_result_set_error (self->priv->set_tilt_result,
                                        G_IO_ERROR,
                                        G_IO_ERROR_CANCELLED,
-                                       "State dependent operation cancelled "
+                                       "Set tilt angle operation cancelled "
                                        "upon device disposal");
 
       g_simple_async_result_complete (self->priv->set_tilt_result);
       g_object_unref (self->priv->set_tilt_result);
       self->priv->set_tilt_result = NULL;
+
+      g_mutex_unlock (self->priv->dispatch_mutex);
+    }
+
+  /* cancel set led operation */
+  if (self->priv->set_led_result != NULL)
+    {
+      g_mutex_lock (self->priv->dispatch_mutex);
+
+      g_simple_async_result_set_error (self->priv->set_led_result,
+                                       G_IO_ERROR,
+                                       G_IO_ERROR_CANCELLED,
+                                       "Set led operation cancelled "
+                                       "upon device disposal");
+
+      g_simple_async_result_complete (self->priv->set_led_result);
+      g_object_unref (self->priv->set_led_result);
+      self->priv->set_led_result = NULL;
 
       g_mutex_unlock (self->priv->dispatch_mutex);
     }
@@ -425,7 +445,11 @@ gfreenect_device_set_property (GObject      *obj,
       break;
 
     case PROP_LED:
-      gfreenect_device_set_led (self, g_value_get_uint (value));
+      gfreenect_device_set_led (self,
+                                g_value_get_uint (value),
+                                NULL,
+                                NULL,
+                                NULL);
       break;
 
     case PROP_TILT_ANGLE:
@@ -766,8 +790,39 @@ dispatch_thread_func (gpointer _data)
           g_mutex_unlock (self->priv->dispatch_mutex);
         }
 
+      /* update led */
+      if (self->priv->update_led)
+        {
+          g_mutex_lock (self->priv->dispatch_mutex);
+
+          self->priv->update_led = FALSE;
+
+          if (freenect_set_led (self->priv->dev, self->priv->led) != 0)
+            {
+              g_warning ("Failed to set led");
+
+              if (self->priv->set_led_result != NULL)
+               {
+                 g_simple_async_result_set_error (self->priv->set_led_result,
+                                                  G_IO_ERROR,
+                                                  G_IO_ERROR_FAILED,
+                                                  "Failed to set led");
+               }
+            }
+
+          if (self->priv->set_led_result != NULL)
+            {
+              g_simple_async_result_complete_in_idle (self->priv->set_led_result);
+              g_object_unref (self->priv->set_led_result);
+              self->priv->set_led_result = NULL;
+            }
+
+          g_mutex_unlock (self->priv->dispatch_mutex);
+        }
+
       /* whether to update tilt state */
       if (self->priv->set_tilt_result != NULL ||
+          self->priv->set_led_result != NULL ||
           self->priv->state_dependent_results != NULL)
         {
           update_tilt_failed = FALSE;
@@ -789,7 +844,7 @@ dispatch_thread_func (gpointer _data)
               g_simple_async_result_set_error (self->priv->set_tilt_result,
                                                G_IO_ERROR,
                                                G_IO_ERROR_FAILED,
-                                               "Failed to obtain state");
+                                               "Failed to obtain tilt state");
               g_simple_async_result_complete_in_idle (
                                         self->priv->set_tilt_result);
               g_object_unref (self->priv->set_tilt_result);
@@ -799,7 +854,6 @@ dispatch_thread_func (gpointer _data)
             }
           else
             {
-
               if (state->tilt_status != TILT_STATUS_MOVING && self->priv->tilt_motor_moving)
                 {
                   /* complete the 'set-tilt' operation */
@@ -860,22 +914,6 @@ dispatch_thread_func (gpointer _data)
 
           g_list_free (self->priv->state_dependent_results);
           self->priv->state_dependent_results = NULL;
-
-          g_mutex_unlock (self->priv->dispatch_mutex);
-        }
-
-      /* update led */
-      if (self->priv->update_led)
-        {
-          g_mutex_lock (self->priv->dispatch_mutex);
-
-          self->priv->update_led = FALSE;
-
-          if (freenect_set_led (self->priv->dev, self->priv->led) != 0)
-            {
-              /* @TODO: this error must be reported! */
-              g_warning ("Failed to set led");
-            }
 
           g_mutex_unlock (self->priv->dispatch_mutex);
         }
@@ -951,6 +989,31 @@ on_set_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
                                         self->priv->set_tilt_result);
       g_object_unref (self->priv->set_tilt_result);
       self->priv->set_tilt_result = NULL;
+
+      g_mutex_unlock (self->priv->dispatch_mutex);
+    }
+}
+
+static void
+on_set_led_cancelled (GCancellable *cancellable, gpointer user_data)
+{
+  GFreenectDevice *self = GFREENECT_DEVICE (user_data);
+
+  if (self->priv->set_led_result != NULL)
+    {
+      g_signal_handlers_disconnect_by_func (cancellable,
+                                            on_set_led_cancelled,
+                                            user_data);
+
+      g_mutex_lock (self->priv->dispatch_mutex);
+      g_simple_async_result_set_error (self->priv->set_led_result,
+                                       G_IO_ERROR,
+                                       G_IO_ERROR_CANCELLED,
+                                       "Set led operation cancelled");
+      g_simple_async_result_complete_in_idle (
+                                        self->priv->set_led_result);
+      g_object_unref (self->priv->set_led_result);
+      self->priv->set_led_result = NULL;
 
       g_mutex_unlock (self->priv->dispatch_mutex);
     }
@@ -1223,20 +1286,75 @@ gfreenect_device_stop_video_stream (GFreenectDevice  *self,
   return TRUE;
 }
 
+/**
+ * gfreenect_device_set_led:
+ * @cancellable: (allow-none):
+ * @callback: (scope async) (allow-none):
+ * @user_data: (allow-none):
+ *
+ **/
 void
-gfreenect_device_set_led (GFreenectDevice *self, GFreenectLed led)
+gfreenect_device_set_led (GFreenectDevice     *self,
+                          GFreenectLed         led,
+                          GCancellable        *cancellable,
+                          GAsyncReadyCallback  callback,
+                          gpointer             user_data)
 {
+  GSimpleAsyncResult *res = NULL;
+
   g_return_if_fail (GFREENECT_IS_DEVICE (self));
+
+  if (callback != NULL)
+    {
+      res = g_simple_async_result_new (G_OBJECT (self),
+                                       callback,
+                                       user_data,
+                                       gfreenect_device_set_led);
+
+      if (self->priv->set_led_result != NULL)
+        {
+          g_simple_async_result_set_error (res,
+                                           G_IO_ERROR,
+                                           G_IO_ERROR_PENDING,
+                                           "Set led operation pending");
+
+          g_simple_async_result_complete_in_idle (res);
+          g_object_unref (res);
+          return;
+        }
+    }
 
   if (self->priv->dispatch_thread == NULL)
     launch_dispatch_thread (self, NULL);
 
   g_mutex_lock (self->priv->dispatch_mutex);
 
+  self->priv->set_led_result = res;
+  if (cancellable != NULL)
+    g_signal_connect (cancellable,
+                      "cancelled",
+                      G_CALLBACK (on_set_led_cancelled),
+                      self);
+
   self->priv->led = led;
   self->priv->update_led = TRUE;
 
   g_mutex_unlock (self->priv->dispatch_mutex);
+}
+
+gboolean
+gfreenect_device_set_led_finish (GFreenectDevice  *self,
+                                 GAsyncResult     *result,
+                                 GError          **error)
+{
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
+  g_return_val_if_fail (g_simple_async_result_is_valid (result,
+                                                      G_OBJECT (self),
+                                                      gfreenect_device_set_led),
+                        FALSE);
+
+  return ! g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
+                                                  error);
 }
 
 /**
