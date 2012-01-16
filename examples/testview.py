@@ -195,9 +195,10 @@ class GFreenectView(Gtk.Window):
                             y_align=Clutter.BoxAlignment.CENTER)
 
     def _on_depth_frame(self, kinect, user_data):
-        data = kinect.get_depth_frame_grayscale()
+        data, frame_mode = kinect.get_depth_frame_grayscale()
         self.depth_texture.set_from_rgb_data(data, False,
-                                             640, 480, 0, 3, 0)
+                                             frame_mode.width, frame_mode.height,
+                                             0, frame_mode.bits_per_pixel / 8, 0)
 
     def _on_video_frame(self, kinect, user_data):
         data, frame_mode = kinect.get_video_frame_rgb()
