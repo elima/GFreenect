@@ -86,13 +86,16 @@ gboolean          gfreenect_device_stop_video_stream          (GFreenectDevice  
 void              gfreenect_device_set_led                    (GFreenectDevice *self,
                                                                GFreenectLed     led);
 
-guint8 *          gfreenect_device_get_depth_frame_raw        (GFreenectDevice *self,
-                                                               gsize           *len);
-guint8 *          gfreenect_device_get_video_frame_raw        (GFreenectDevice *self,
-                                                               gsize           *len);
+guint8 *          gfreenect_device_get_depth_frame_raw        (GFreenectDevice    *self,
+                                                               gsize              *len,
+                                                               GFreenectFrameMode *frame_mode);
+guint8 *          gfreenect_device_get_video_frame_raw        (GFreenectDevice    *self,
+                                                               gsize              *len,
+                                                               GFreenectFrameMode *frame_mode);
 
-guint8 *          gfreenect_device_get_depth_frame_grayscale  (GFreenectDevice *self,
-                                                               gsize           *len);
+guint8 *          gfreenect_device_get_depth_frame_grayscale  (GFreenectDevice    *self,
+                                                               gsize              *len,
+                                                               GFreenectFrameMode *frame_mode);
 
 guint8 *          gfreenect_device_get_video_frame_rgb        (GFreenectDevice    *self,
                                                                gsize              *len,

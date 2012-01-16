@@ -1241,14 +1241,20 @@ gfreenect_device_set_led (GFreenectDevice *self, GFreenectLed led)
 
 /**
  * gfreenect_device_get_depth_frame_raw:
- * @len: (out):
+ * @len: (out) (allow-none):
+ * @frame_mode: (out) (allow-none):
  *
  * Returns: (array length=len) (element-type guint8):
  **/
 guint8 *
-gfreenect_device_get_depth_frame_raw (GFreenectDevice *self, gsize *len)
+gfreenect_device_get_depth_frame_raw (GFreenectDevice    *self,
+                                      gsize              *len,
+                                      GFreenectFrameMode *frame_mode)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), NULL);
+
+  if (frame_mode != NULL)
+    gfreenect_frame_mode_set_from_native (frame_mode, &self->priv->depth_mode);
 
   if (len != NULL)
     *len = self->priv->depth_mode.bytes;
@@ -1259,13 +1265,19 @@ gfreenect_device_get_depth_frame_raw (GFreenectDevice *self, gsize *len)
 /**
  * gfreenect_device_get_video_frame_raw:
  * @len: (out) (allow-none):
+ * @frame_mode: (out) (allow-none):
  *
  * Returns: (array length=len) (element-type guint8) (transfer none):
  **/
 guint8 *
-gfreenect_device_get_video_frame_raw (GFreenectDevice *self, gsize *len)
+gfreenect_device_get_video_frame_raw (GFreenectDevice    *self,
+                                      gsize              *len,
+                                      GFreenectFrameMode *frame_mode)
 {
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), NULL);
+
+  if (frame_mode != NULL)
+    gfreenect_frame_mode_set_from_native (frame_mode, &self->priv->video_mode);
 
   if (len != NULL)
     *len = self->priv->video_mode.bytes;
@@ -1276,11 +1288,14 @@ gfreenect_device_get_video_frame_raw (GFreenectDevice *self, gsize *len)
 /**
  * gfreenect_device_get_depth_frame_grayscale:
  * @len: (out) (allow-none):
+ * @frame_mode: (out) (transfer none) (allow-none):
  *
  * Returns: (array length=len) (element-type guint8) (transfer none):
  **/
 guint8 *
-gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
+gfreenect_device_get_depth_frame_grayscale (GFreenectDevice    *self,
+                                            gsize              *len,
+                                            GFreenectFrameMode *frame_mode)
 {
   guint8 *rgb_buf;
   gint i;
@@ -1290,6 +1305,18 @@ gfreenect_device_get_depth_frame_grayscale (GFreenectDevice *self, gsize *len)
   gsize pixels;
 
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), NULL);
+
+  if (frame_mode != NULL)
+    {
+      gfreenect_frame_mode_set_from_native (frame_mode, &self->priv->depth_mode);
+
+      frame_mode->video_format = GFREENECT_VIDEO_FORMAT_RGB;
+
+      frame_mode->bits_per_pixel = 24;
+      frame_mode->padding_bits_per_pixel = 0;
+
+      frame_mode->length = frame_mode->width * frame_mode->height * 3;
+    }
 
   rgb_buf = (guint8 *) self->priv->user_buf;
 
@@ -1349,7 +1376,7 @@ gfreenect_device_get_video_frame_rgb (GFreenectDevice    *self,
     {
     case FREENECT_VIDEO_YUV_RGB:
     case FREENECT_VIDEO_RGB:
-      rgb_buf = gfreenect_device_get_video_frame_raw (self, len);
+      rgb_buf = gfreenect_device_get_video_frame_raw (self, len, NULL);
       break;
 
     case FREENECT_VIDEO_IR_8BIT:
