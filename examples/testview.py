@@ -154,7 +154,7 @@ class GFreenectView(Gtk.Window):
             dialog.destroy()
             Gtk.main_quit()
             return
-        self.kinect.set_led(GFreenect.Led.GREEN)
+        self.kinect.set_led(GFreenect.Led.GREEN, None, None, None)
         self.kinect.set_tilt_angle(self._tilt_scale.get_value(),
                                    None,
                                    self._on_set_tilt_finish,
@@ -224,11 +224,19 @@ class GFreenectView(Gtk.Window):
                                    self._on_set_tilt_finish,
                                    None)
 
+    def _on_set_led_finish(self, kinect, result, user_data):
+        try:
+            kinect.set_led_finish(result)
+        except Exception, e:
+            print e.message
+        self.led_combobox.set_sensitive(True)
+
     def _on_combobox_changed(self, combobox):
         model = combobox.get_model()
         iter = combobox.get_active_iter()
         led_mode = model.get_value(iter, 1)
-        self.kinect.set_led(led_mode)
+        self.led_combobox.set_sensitive(False)
+        self.kinect.set_led(led_mode, None, self._on_set_led_finish, None)
 
     def _create_error_dialog(self, message):
         return Gtk.MessageDialog(self,
