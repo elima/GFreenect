@@ -29,7 +29,13 @@ from gi.repository import Gtk, GObject
 from gi.repository import GtkClutter
 
 class GFreenectView(Gtk.Window):
+    '''
+    This is a window that allows to test GFreenect's functions
+    and control a Kinect device with it.
 
+    It uses GTK+ for the widgets and embeds a Clutter stage for
+    showing the video and depth streams.
+    '''
     def __init__(self):
         Gtk.Window.__init__(self, type=Gtk.WindowType.TOPLEVEL)
         self.set_title('GFreenect View')
@@ -104,6 +110,7 @@ class GFreenectView(Gtk.Window):
         bottom_contents.pack_start(self._accel_y_label, fill=False, expand=False, padding=6)
         bottom_contents.pack_start(self._accel_z_label, fill=False, expand=False, padding=6)
 
+        # Initialize GFreenect asynchronously
         self.kinect = None
         GFreenect.Device.new(0,
                              GFreenect.Subdevice.ALL,
@@ -117,6 +124,9 @@ class GFreenectView(Gtk.Window):
         tilt_scale = Gtk.Scale.new_with_range(Gtk.Orientation.VERTICAL,
                                               -31, 31, 1)
         tilt_scale.set_value(0)
+        # Assigns the marks with the inverted values because
+        # we want to show positive values on top and negative
+        # ones on bottom, unlike the default usage
         tilt_scale.add_mark(31, Gtk.PositionType.LEFT, '-31 º')
         tilt_scale.add_mark(0, Gtk.PositionType.LEFT, '0 º')
         tilt_scale.add_mark(-31, Gtk.PositionType.LEFT, '31 º')
@@ -138,15 +148,26 @@ class GFreenectView(Gtk.Window):
         return led_combobox
 
     def _on_set_tilt_finish(self, kinect, result, user_data):
+        '''
+        Called when the tilt has finished moving.
+        '''
         try:
+            # Will throw an exception if there were errors
+            # when moving the tilt
             kinect.set_tilt_angle_finish(result)
         except:
             pass
         self._tilt_scale.set_sensitive(True)
 
     def _on_kinect_ready(self, kinect, result, layout_manager):
+        '''
+        Called when the Kinect device is ready.
+        '''
         self.kinect = kinect
         try:
+            # Will throw an exception if there were errors
+            # when initializing the Kinect. e.g. no device found,
+            # no permissions to access the device, etc.
             self.kinect.new_finish(result)
         except Exception, e:
             dialog = self._create_error_dialog('Error:\n %s' % e.message)
@@ -154,25 +175,35 @@ class GFreenectView(Gtk.Window):
             dialog.destroy()
             Gtk.main_quit()
             return
+        # Set the LED with the green color
         self.kinect.set_led(GFreenect.Led.GREEN, None, None, None)
+        # Set the angle to 0 because at this moment the tilt scale
+        # has this value
         self.kinect.set_tilt_angle(self._tilt_scale.get_value(),
                                    None,
                                    self._on_set_tilt_finish,
                                    None);
+        # Connect to the depth-frame: call the _on_depth_frame
+        # function whenever a new depth frame is available
         self.kinect.connect("depth-frame",
                             self._on_depth_frame,
                             None)
+        # Do the same as above but this time for the video frames
         self.kinect.connect("video-frame",
                             self._on_video_frame,
                             None)
 
         try:
+            # Starts getting information from the depth camera in 11BIT format
+            # Might throw an exception if there were errors
             self.kinect.start_depth_stream(getattr(GFreenect.DepthFormat, '11BIT'))
         except Exception, e:
             print e.message
             Gtk.main_quit()
 
         try:
+            # Starts getting information from the video camera in RGB format
+            # Might throw an exception if there were errors
             self.kinect.start_video_stream(GFreenect.Resolution.MEDIUM,
                                            GFreenect.VideoFormat.RGB)
         except Exception, e:
@@ -195,13 +226,27 @@ class GFreenectView(Gtk.Window):
                             y_align=Clutter.BoxAlignment.CENTER)
 
     def _on_depth_frame(self, kinect, user_data):
+        '''
+        Called when a new depth frame is available.
+        '''
+        # The data is a string representing the frame's bytes
+        # the frame_mode is an object with information about the frame
+        #
+        # Getting it grayscale will give us RGB information where each of
+        # the channels has the same value and we do so because it's needed
+        # for painting it on the Clutter texture
         data, frame_mode = kinect.get_depth_frame_grayscale()
+        # Set the Clutter texture with the frame data so it is painted
         self.depth_texture.set_from_rgb_data(data, False,
                                              frame_mode.width, frame_mode.height,
                                              0, frame_mode.bits_per_pixel / 8, 0)
 
     def _on_video_frame(self, kinect, user_data):
+        '''
+        Called when a new video frame is available.
+        '''
         data, frame_mode = kinect.get_video_frame_rgb()
+        # Set the Clutter texture with the frame data so it is painted
         self.video_texture.set_from_rgb_data(data, False,
                                              frame_mode.width, frame_mode.height,
                                              0, frame_mode.bits_per_pixel / 8, 0)
@@ -210,14 +255,33 @@ class GFreenectView(Gtk.Window):
         textures_box.set_geometry(actor.get_geometry())
 
     def _on_scale_value_changed(self, scale):
+        '''
+        Called when the scale's value was changed.
+        Since this happens a number of times when the user
+        is choosing the wanted value, to void setting the
+        tilt's angle many times it uses a timeout so it will
+        only in fact be set 500 ms after the user has chosen
+        the value.
+        '''
         if self._tilt_scale_timeout > 0:
+            # Remove the on-going timeout function
             GObject.source_remove(self._tilt_scale_timeout)
         self._tilt_scale_timeout = GObject.timeout_add(500, self._scale_value_changed_timeout)
 
     def _on_scale_format_value(self, scale, value):
+        '''
+        Called when the scale's value label is formatted.
+        We need to invert the value because we are using
+        the scale contrary to its original orientation:
+        positive on the bottom, negative values on the top.
+        '''
         return '%s º   ' % int(-value)
 
     def _scale_value_changed_timeout(self):
+        '''
+        Called 500 ms after the user has chosen a value from
+        the scale.
+        '''
         self._tilt_scale.set_sensitive(False)
         self.kinect.set_tilt_angle(-self._tilt_scale.get_value(),
                                    None,
@@ -225,17 +289,25 @@ class GFreenectView(Gtk.Window):
                                    None)
 
     def _on_set_led_finish(self, kinect, result, user_data):
+        '''
+        Called when the Kinect is finished setting the LED mode.
+        '''
         try:
+            # Might throw an exception if errors occurred
             kinect.set_led_finish(result)
         except Exception, e:
             print e.message
         self.led_combobox.set_sensitive(True)
 
     def _on_combobox_changed(self, combobox):
+        '''
+        Called when the combobox values are changed.
+        '''
         model = combobox.get_model()
         iter = combobox.get_active_iter()
         led_mode = model.get_value(iter, 1)
         self.led_combobox.set_sensitive(False)
+        # Set the LED has chosen from the combobox
         self.kinect.set_led(led_mode, None, self._on_set_led_finish, None)
 
     def _create_error_dialog(self, message):
@@ -246,9 +318,15 @@ class GFreenectView(Gtk.Window):
                                  message)
 
     def _get_accel(self):
+        '''
+        Gets the accelerometer's values asynchronously.
+        '''
         self.kinect.get_accel(None, self._on_accel_finish, None)
 
     def _on_accel_finish(self, kinect, result, user_data):
+        '''
+        Called when the accelerometer's value are retrieved
+        '''
         success, x, y, z = kinect.get_accel_finish(result)
         if success:
             self._accel_x_label.set_markup('<b>X:</b> %s' % x)
@@ -259,6 +337,12 @@ class GFreenectView(Gtk.Window):
         self._accel_timeout = GObject.timeout_add(250, self._get_accel)
 
     def _on_video_format_radio_clicked(self, rgb_radio):
+        '''
+        Called when the video format radio button is clicked.
+        It stops the current video stream, sets the new mode and
+        restarts it again.
+        This way it can show either RGB or Infra-red video.
+        '''
         self.kinect.stop_video_stream()
         if rgb_radio.get_active():
             video_format = GFreenect.VideoFormat.RGB
@@ -268,6 +352,11 @@ class GFreenectView(Gtk.Window):
                                        video_format)
 
     def _on_delete_event(self, window, event):
+        '''
+        Called when the window is closed.
+        If there is a recognized Kinect device it stops the
+        video and depth streams and quits the application.
+        '''
         if self.kinect:
             self.kinect.stop_video_stream()
             self.kinect.stop_depth_stream()
