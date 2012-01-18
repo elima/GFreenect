@@ -269,6 +269,7 @@ class GFreenectView(Gtk.Window):
 
     def _on_delete_event(self, window, event):
         if self.kinect:
+            self.kinect.stop_video_stream()
             self.kinect.stop_depth_stream()
         Gtk.main_quit()
 
