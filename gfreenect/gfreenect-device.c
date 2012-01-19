@@ -292,8 +292,8 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
                                    g_param_spec_double ("tilt-angle",
                                                         "Tilt angle",
                                                         "Vertical angle relative to the horizon",
-                                                        -30.0,
-                                                        30.0,
+                                                        -31.0,
+                                                        31.0,
                                                         DEFAULT_TILT_ANGLE,
                                                         G_PARAM_READWRITE |
                                                         G_PARAM_STATIC_STRINGS));
