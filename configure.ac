@@ -116,9 +116,11 @@ AM_CONDITIONAL(ENABLE_DEBUG, test x"${enable_debug}" = x"yes")
 
 # Output files
 AC_OUTPUT([
-	Makefile
-	gfreenect/Makefile
-	gfreenect/gfreenect-0.1.pc
+        Makefile
+        gfreenect/Makefile
+        gfreenect/gfreenect-0.1.pc
+        doc/Makefile
+        doc/reference/Makefile
 ])
 
 echo ""

@@ -1,0 +1,27 @@
+<part id="gfreenect-overview">
+
+  <title>Overview</title>
+
+  <partintro>
+
+    <para>
+      GFreenect is a GObject wrapper to libfreenect, a library to access and
+      control the Microsoft(tm) Kinect(tm) sensor.
+    </para>
+
+    <para>
+      Its main purpose is to provide smooth integration between the Kinect
+      and GNOME technologies such as Clutter and GTK. This essentially means
+      that GFreenect integrates nicely with a GLib main loop, and provides
+      a fully asynchronous API to prevent blocking operations from
+      affecting the applications' main flow.
+    </para>
+
+    <para>
+      GFreenect intends to provide also a synchronous API, but it is still
+      work in progress.
+    </para>
+
+  </partintro>
+
+</part>
