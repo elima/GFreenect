@@ -20,6 +20,39 @@
  * for more details.
  */
 
+/**
+ * SECTION:gfreenect-device
+ * @short_description: Object representing a kinect sensor device
+ *
+ * A #GFreenectDevice is created using the asynchronous failable constructor
+ * gfreenect_device_new(). Then gfreenect_device_new_finish() is called
+ * within the provided callback, to obtain the new #GFreenectDevice instance.
+ *
+ * Use gfreenect_device_set_tilt_angle() and
+ * gfreenect_device_set_tilt_angle_finish() to asynchronously move the tilt
+ * motor to the desired angle. gfreenect_device_get_tilt_angle() and
+ * gfreenect_device_get_tilt_angle_finish() are used to obtain the current tilt
+ * angle, also asynchronously. For a synchronous call use
+ * gfreenect_device_get_tilt_angle_sync().
+ *
+ * The led status is set asynchronously using gfreenect_device_set_led() and
+ * gfreenect_device_set_led_finish().
+ *
+ * To start the depth or video camera streams,
+ * use gfreenect_device_start_depth_stream() and
+ * gfreenect_device_start_video_stream() respectively. Then connect to the
+ * signals #GFreenectDevice::depth-frame and #GFreenectDevice::video-frame
+ * to get notified when a new frame is available. The actual frame data is
+ * obtained using methods like gfreenect_device_get_depth_frame_raw(),
+ * gfreenect_device_get_depth_frame_grayscale(),
+ * gfreenect_device_get_video_frame_rgb(), etc. Note that these methods should
+ * only be called from within the signal handlers.
+ *
+ * The accelerometer data can be obtained asynchronously using
+ * gfreenect_device_get_accel() and gfreenect_device_get_accel_finish(),
+ * or synchronously using gfreenect_device_get_accel_sync().
+ **/
+
 #include <libfreenect.h>
 #include <string.h>
 #include <math.h>
@@ -166,6 +199,14 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
   obj_class->set_property = gfreenect_device_set_property;
 
   /* install signals */
+
+  /**
+   * GFreenectDevice::depth-frame:
+   * @self: The #GFreenectDevice
+   *
+   * Called whenever a new depth frame is available. The depth stream has to be
+   * started with gfreenect_device_start_depth_stream().
+   **/
   gfreenect_device_signals[SIGNAL_DEPTH_FRAME] =
     g_signal_new ("depth-frame",
           G_TYPE_FROM_CLASS (obj_class),
@@ -175,6 +216,13 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
           g_cclosure_marshal_VOID__VOID,
           G_TYPE_NONE, 0);
 
+  /**
+   * GFreenectDevice::video-frame:
+   * @self: The #GFreenectDevice
+   *
+   * Called whenever a new video frame is available. The video stream has to be
+   * started with gfreenect_device_start_video_stream().
+   **/
   gfreenect_device_signals[SIGNAL_VIDEO_FRAME] =
     g_signal_new ("video-frame",
           G_TYPE_FROM_CLASS (obj_class),
@@ -185,6 +233,13 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
           G_TYPE_NONE, 0);
 
   /* install properties */
+
+  /**
+   * GFreenectDevice:index
+   *
+   * The index of the kinect device sensor in the bus. Normally zero for a
+   * single device.
+   **/
   g_object_class_install_property (obj_class,
                                    PROP_INDEX,
                                    g_param_spec_int ("index",
@@ -195,7 +250,12 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
                                                      -1,
                                                      G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                                                      G_PARAM_STATIC_STRINGS));
-
+  /**
+   * GFreenectDevice:subdevices
+   *
+   * The or'ed combination of subdevices from #GFreenectSubdevice that
+   * have been activated.
+   **/
   g_object_class_install_property (obj_class,
                                    PROP_SUBDEVICES,
                                    g_param_spec_uint ("subdevices",
@@ -207,6 +267,11 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
                                                       G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY |
                                                       G_PARAM_STATIC_STRINGS));
 
+  /**
+   * GFreenectDevice:led
+   *
+   * The status of the sensor's led, from  #GFreenectLed set.
+   **/
   g_object_class_install_property (obj_class,
                                    PROP_LED,
                                    g_param_spec_uint ("led",
@@ -217,7 +282,11 @@ gfreenect_device_class_init (GFreenectDeviceClass *class)
                                                       GFREENECT_LED_OFF,
                                                       G_PARAM_READWRITE |
                                                       G_PARAM_STATIC_STRINGS));
-
+  /**
+   * GFreenectDevice:tilt-angle
+   *
+   * The sensor's tilt motor angle relative to the horizon.
+   **/
   g_object_class_install_property (obj_class,
                                    PROP_TILT_ANGLE,
                                    g_param_spec_double ("tilt-angle",
@@ -1052,9 +1121,14 @@ on_get_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
 
 /**
  * gfreenect_device_new:
- * @cancellable: (allow-none):
- * @callback: (scope async):
- * @user_data: (allow-none):
+ * @device_index: The device index to use, normally 0 for one kinect sensor attached
+ * @subdevices: Or'ed combination of subdevices to use from #GFreenectSubdevice set
+ * @cancellable: (allow-none): The cancellable object
+ * @callback: (scope async): The callback to be called when the new instance is ready
+ * @user_data: (allow-none): User data to pass in @callback
+ *
+ * Constructs a new #GFreenectDevice object asynchronously. The actual instance is
+ * obtained with gfreenect_device_new_finish() when @callback is called.
  **/
 void
 gfreenect_device_new (gint                 device_index,
@@ -1074,8 +1148,15 @@ gfreenect_device_new (gint                 device_index,
 
 /**
  * gfreenect_device_new_finish:
+ * @result: The #GAsyncResult provided in the callback
+ * @error: (allow-none): A pointer to a #GError, or %NULL
  *
- * Returns: (transfer full):
+ * Returns the new instance of #GFreenectDevice constructed with
+ * gfreenect_device_new(), or %NULL if an error occurred, in which case
+ * @error is set acordingly.
+ *
+ * Returns: (transfer full): The newly created #GFreenectDevice upon success,
+ * of %NULL otherwise.
  **/
 GFreenectDevice *
 gfreenect_device_new_finish (GAsyncResult *result, GError **error)
@@ -1105,6 +1186,18 @@ gfreenect_device_new_finish (GAsyncResult *result, GError **error)
     }
 }
 
+/**
+ * gfreenect_device_start_depth_stream:
+ * @self: The #GFreenectDevice
+ * @format: A #GFreenectDepthFormat to use
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Starts the depth camera stream. After calling this, the #GFreenectDevice::depth-frame
+ * signal is triggered whenever a new frame is available. Use
+ * gfreenect_device_stop_depth_stream() to stop it.
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
+ **/
 gboolean
 gfreenect_device_start_depth_stream (GFreenectDevice       *self,
                                      GFreenectDepthFormat   format,
@@ -1172,6 +1265,16 @@ gfreenect_device_start_depth_stream (GFreenectDevice       *self,
   return TRUE;
 }
 
+/**
+ * gfreenect_device_stop_depth_stream:
+ * @self: The #GFreenectDevice
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Stops the depth camera stream that was previously started with
+ * gfreenect_device_start_depth_stream().
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
+ **/
 gboolean
 gfreenect_device_stop_depth_stream (GFreenectDevice  *self,
                                     GError          **error)
@@ -1195,6 +1298,19 @@ gfreenect_device_stop_depth_stream (GFreenectDevice  *self,
   return TRUE;
 }
 
+/**
+ * gfreenect_device_start_video_stream:
+ * @self: The #GFreenectDevice
+ * @resolution: A #GFreenectResolution to use
+ * @format: A #GFreenectVideoFormat to use
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Starts the video camera stream. After calling this, the #GFreenectDevice::video-frame
+ * signal is triggered whenever a new frame is available. Use
+ * gfreenect_device_stop_video_stream() to stop it.
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
+ **/
 gboolean
 gfreenect_device_start_video_stream (GFreenectDevice      *self,
                                      GFreenectResolution   resolution,
@@ -1263,6 +1379,16 @@ gfreenect_device_start_video_stream (GFreenectDevice      *self,
   return TRUE;
 }
 
+/**
+ * gfreenect_device_stop_video_stream:
+ * @self: The #GFreenectDevice
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Stops the video camera stream that was previously started with
+ * gfreenect_device_start_video_stream().
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
+ **/
 gboolean
 gfreenect_device_stop_video_stream (GFreenectDevice  *self,
                                     GError          **error)
@@ -1288,10 +1414,18 @@ gfreenect_device_stop_video_stream (GFreenectDevice  *self,
 
 /**
  * gfreenect_device_set_led:
- * @cancellable: (allow-none):
- * @callback: (scope async) (allow-none):
- * @user_data: (allow-none):
+ * @self: The #GFreenectDevice
+ * @led: A led status from #GFreenectLed
+ * @cancellable: (allow-none): A cancellable object, or %NULL
+ * @callback: (scope async) (allow-none): The function to call upon completion,
+ * or %NULL
+ * @user_data: (allow-none): Arbitrary user data to pass in @callback, or %NULL
  *
+ * Sets the status of the device's led asynchronously. Use
+ * gfreenect_device_set_led_finish() to obtain the result of the operation.
+ *
+ * If this method is called while a previous operation has not completed, a
+ * %G_IO_ERROR_PENDING error occurs.
  **/
 void
 gfreenect_device_set_led (GFreenectDevice     *self,
@@ -1342,6 +1476,16 @@ gfreenect_device_set_led (GFreenectDevice     *self,
   g_mutex_unlock (self->priv->dispatch_mutex);
 }
 
+/**
+ * gfreenect_device_set_led_finish:
+ * @self: The #GFreenectDevice
+ * @result: The #GAsyncResult provided in the callback
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Obtains the result of a gfreenect_device_set_led() operation.
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
+ **/
 gboolean
 gfreenect_device_set_led_finish (GFreenectDevice  *self,
                                  GAsyncResult     *result,
@@ -1359,10 +1503,21 @@ gfreenect_device_set_led_finish (GFreenectDevice  *self,
 
 /**
  * gfreenect_device_get_depth_frame_raw:
- * @len: (out) (allow-none):
- * @frame_mode: (out) (allow-none):
+ * @self: The #GFreenectDevice
+ * @len: (out) (allow-none): A pointer to retrieve the length of the returned
+ * frame data
+ * @frame_mode: (out) (allow-none): A #GFreenectFrameMode structure to fill
+ * with the attributes of the frame
  *
- * Returns: (array length=len) (element-type guint8):
+ * Retrieves one depth frame in raw format as provided by the lower levels.
+ * Optionally the frame metadata can also be retrieved providing a non-%NULL
+ * pointer to a #GFreenectFrameMode structure in @frame_mode.
+ *
+ * This method should only be called within a #GFreenectDevice::depth-frame
+ * signal handler, otherwise the returned values can be undefined.
+ *
+ * Returns: (array length=len) (element-type guint8) (transfer none): An array
+ * of @len bytes representing the frame data.
  **/
 guint8 *
 gfreenect_device_get_depth_frame_raw (GFreenectDevice    *self,
@@ -1382,10 +1537,21 @@ gfreenect_device_get_depth_frame_raw (GFreenectDevice    *self,
 
 /**
  * gfreenect_device_get_video_frame_raw:
- * @len: (out) (allow-none):
- * @frame_mode: (out) (allow-none):
+ * @self: The #GFreenectDevice
+ * @len: (out) (allow-none): A pointer to retrieve the length of the returned
+ * frame data
+ * @frame_mode: (out) (allow-none): A #GFreenectFrameMode structure to fill
+ * with the attributes of the frame
  *
- * Returns: (array length=len) (element-type guint8) (transfer none):
+ * Retrieves one video frame in raw format as provided by the lower levels.
+ * Optionally the frame metadata can also be retrieved providing a non-%NULL
+ * pointer to a #GFreenectFrameMode structure in @frame_mode.
+ *
+ * This method should only be called within a #GFreenectDevice::video-frame
+ * signal handler, otherwise the returned values can be undefined.
+ *
+ * Returns: (array length=len) (element-type guint8) (transfer none): An array
+ * of @len bytes representing the frame data.
  **/
 guint8 *
 gfreenect_device_get_video_frame_raw (GFreenectDevice    *self,
@@ -1405,10 +1571,23 @@ gfreenect_device_get_video_frame_raw (GFreenectDevice    *self,
 
 /**
  * gfreenect_device_get_depth_frame_grayscale:
- * @len: (out) (allow-none):
- * @frame_mode: (out) (transfer none) (allow-none):
+ * @self: The #GFreenectDevice
+ * @len: (out) (allow-none): A pointer to retrieve the length of the returned
+ * frame data
+ * @frame_mode: (out) (allow-none): A #GFreenectFrameMode structure to fill
+ * with the attributes of the frame
  *
- * Returns: (array length=len) (element-type guint8) (transfer none):
+ * Retrieves one depth frame in RGB format using gray values to represent the
+ * depth. This method is useful for rendering the frame directly to an RGB
+ * capable texture.
+ * Optionally the frame metadata can also be retrieved providing a non-%NULL
+ * pointer to a #GFreenectFrameMode structure in @frame_mode.
+ *
+ * This method should only be called within a #GFreenectDevice::depth-frame
+ * signal handler, otherwise the returned values can be undefined.
+ *
+ * Returns: (array length=len) (element-type guint8) (transfer none): An array
+ * of @len bytes representing the frame data.
  **/
 guint8 *
 gfreenect_device_get_depth_frame_grayscale (GFreenectDevice    *self,
@@ -1461,10 +1640,24 @@ gfreenect_device_get_depth_frame_grayscale (GFreenectDevice    *self,
 
 /**
  * gfreenect_device_get_video_frame_rgb:
- * @len: (out) (allow-none):
- * @frame_mode: (out) (transfer none) (allow-none):
+ * @self: The #GFreenectDevice
+ * @len: (out) (allow-none): A pointer to retrieve the length of the returned
+ * frame data
+ * @frame_mode: (out) (allow-none): A #GFreenectFrameMode structure to fill
+ * with the attributes of the frame
  *
- * Returns: (array length=len) (element-type guint8) (transfer none):
+ * Retrieves one video frame in RGB format. A conversion to RGB is applied if
+ * the video format is set to IR (infra-red). This method is useful for
+ * rendering the frame directly to an RGB capable texture.
+ *
+ * Optionally the frame metadata can also be retrieved providing a non-%NULL
+ * pointer to a #GFreenectFrameMode structure in @frame_mode.
+ *
+ * This method should only be called within a #GFreenectDevice::depth-frame
+ * signal handler, otherwise the returned values can be undefined.
+ *
+ * Returns: (array length=len) (element-type guint8) (transfer none): An array
+ * of @len bytes representing the frame data.
  **/
 guint8 *
 gfreenect_device_get_video_frame_rgb (GFreenectDevice    *self,
@@ -1529,9 +1722,19 @@ gfreenect_device_get_video_frame_rgb (GFreenectDevice    *self,
 
 /**
  * gfreenect_device_set_tilt_angle:
- * @cancellable: (allow-none):
- * @callback: (scope async):
+ * @self: The #GFreenectDevice
+ * @tilt_angle: The angle to move the tilt motor to
+ * @cancellable: (allow-none): A cancellable object, or %NULL
+ * @callback: (scope async) (allow-none): The function to call upon completion,
+ * or %NULL
+ * @user_data: (allow-none): Arbitrary user data to pass in @callback, or %NULL
  *
+ * Moves the tilt motor angle to @tilt_angle asynchronously. Acceptable values
+ * are in the range -31.0 to 31.0. Use gfreenect_device_set_tilt_angle_finish()
+ * to obtain the result of the operation.
+ *
+ * If this method is called while a previous operation has not completed (the
+ * motor is still moving), a %G_IO_ERROR_PENDING error occurs.
  **/
 void
 gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
@@ -1592,6 +1795,16 @@ gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
   g_mutex_unlock (self->priv->dispatch_mutex);
 }
 
+/**
+ * gfreenect_device_set_tilt_angle_finish:
+ * @self: The #GFreenectDevice
+ * @result: The #GAsyncResult provided in the callback
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Obtains the result of a gfreenect_device_set_tilt_angle() operation.
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
+ **/
 gboolean
 gfreenect_device_set_tilt_angle_finish (GFreenectDevice  *self,
                                         GAsyncResult     *result,
@@ -1609,9 +1822,15 @@ gfreenect_device_set_tilt_angle_finish (GFreenectDevice  *self,
 
 /**
  * gfreenect_device_get_tilt_angle:
- * @cancellable: (allow-none):
- * @callback: (scope async):
+ * @self: The #GFreenectDevice
+ * @cancellable: (allow-none): A cancellable object, or %NULL
+ * @callback: (scope async) (allow-none): A function to be called upon
+ * completion, or %NULL
+ * @user_data: (allow-none): An arbitrary user data to pass in @callback,
+ * or %NULL
  *
+ * Asynchronously gets the current angle of the tilt motor. Use
+ * gfreenect_device_get_tilt_angle_finish() to obtain the results.
  **/
 void
 gfreenect_device_get_tilt_angle (GFreenectDevice     *self,
@@ -1643,6 +1862,17 @@ gfreenect_device_get_tilt_angle (GFreenectDevice     *self,
   g_mutex_unlock (self->priv->dispatch_mutex);
 }
 
+/**
+ * gfreenect_device_get_tilt_angle_finish:
+ * @self: The #GFreenectDevice
+ * @result: The #GAsyncResult provided in the callback
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Obtains the result of a gfreenect_device_get_tilt_angle() operation.
+ *
+ * Returns: The tilt motor angle, or 0.0 upon error. Notice that 0.0 is a valid
+ * return value so the @error argument should also be checked.
+ **/
 gdouble
 gfreenect_device_get_tilt_angle_finish (GFreenectDevice  *self,
                                         GAsyncResult     *result,
@@ -1669,6 +1899,18 @@ gfreenect_device_get_tilt_angle_finish (GFreenectDevice  *self,
   return 0.0;
 }
 
+/**
+ * gfreenect_device_get_tilt_angle_sync:
+ * @self: The #GFreenectDevice
+ * @cancellable: (allow-none): A cancellable object, or %NULL
+ * @error: (allow-none): A pointer to a #GError, or %NULL
+ *
+ * Gets the current angle of the tilt motor synchronously. This is the blocking
+ * version of gfreenect_device_get_tilt_angle().
+ *
+ * Returns: The tilt motor angle, or 0.0 upon error. Notice that 0.0 is a valid
+ * return value so the @error argument should also be checked.
+ **/
 gdouble
 gfreenect_device_get_tilt_angle_sync (GFreenectDevice  *self,
                                       GCancellable     *cancellable,
@@ -1701,10 +1943,18 @@ gfreenect_device_get_tilt_angle_sync (GFreenectDevice  *self,
 
 /**
  * gfreenect_device_get_accel:
- * @cancellable: (allow-none):
- * @callback: (scope async):
- * @user_data: (allow-none)
+ * @self: The #GFreenectDevice
+ * @cancellable: (allow-none): A cancellable object, or %NULL
+ * @callback: (scope async) (allow-none): A function to be called upon
+ * completion, or %NULL
+ * @user_data: (allow-none): An arbitrary user data to pass in @callback,
+ * or %NULL
  *
+ * Gets the accelerometer data asynchronously. Use
+ * gfreenect_device_get_accel_finish() to obtain the results.
+ *
+ * See gfreenect_device_get_accel_sync() for a blocking version of this
+ * method.
  **/
 void
 gfreenect_device_get_accel (GFreenectDevice     *self,
@@ -1738,12 +1988,17 @@ gfreenect_device_get_accel (GFreenectDevice     *self,
 
 /**
  * gfreenect_device_get_accel_finish:
- * @x: (out) (allow-none):
- * @y: (out) (allow-none):
- * @z: (out) (allow-none):
+ * @self: The #GFreenectDevice
+ * @x: (out) (allow-none): A pointer to retrieve the X-axis value of the accelerometer
+ * @y: (out) (allow-none): A pointer to retrieve the Y-axis value of the accelerometer
+ * @z: (out) (allow-none): A pointer to retrieve the Z-axis value of the accelerometer
+ * @result: The #GAsyncResult provided in the callback
+ * @error: (allow-none): A pointer to a #GError, or %NULL
  *
- * Return value: %TRUE on success, %FALSE on failure
+ * Retrieves the result of a gfreenect_device_get_accel()
+ * operation.
  *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
  **/
 gboolean
 gfreenect_device_get_accel_finish (GFreenectDevice  *self,
@@ -1779,12 +2034,17 @@ gfreenect_device_get_accel_finish (GFreenectDevice  *self,
 
 /**
  * gfreenect_device_get_accel_sync:
- * @x: (out) (allow-none):
- * @y: (out) (allow-none):
- * @z: (out) (allow-none):
- * @cancellable: (allow-none):
+ * @self: The #GFreenectDevice
+ * @x: (out) (allow-none): A pointer to retrieve the X-axis value of the accelerometer
+ * @y: (out) (allow-none): A pointer to retrieve the Y-axis value of the accelerometer
+ * @z: (out) (allow-none): A pointer to retrieve the Z-axis value of the accelerometer
+ * @cancellable: (allow-none): A cancellable object, or %NULL
+ * @error: (allow-none): A pointer to a #GError, or %NULL
  *
- * Return value: %TRUE on success, %FALSE on failure
+ * Retrieves the accelerometer data synchronously. See
+ * gfreenect_device_get_accel() for a non-blocking version of this method.
+ *
+ * Returns: %TRUE on success or %FALSE if an error occurred.
  **/
 gboolean
 gfreenect_device_get_accel_sync (GFreenectDevice  *self,

@@ -43,6 +43,11 @@ struct _GFreenectDevice
   GFreenectDevicePrivate *priv;
 };
 
+/**
+ * GFreenectDeviceClass:
+ * @depth_frame: Prototype for #GFreenectDevice::depth-frame signal
+ * @video_frame: Prototype for #GFreenectDevice::video-frame signal
+ **/
 struct _GFreenectDeviceClass
 {
   GObjectClass parent_class;
@@ -138,7 +143,6 @@ gboolean          gfreenect_device_get_accel_finish           (GFreenectDevice  
                                                                gdouble          *z,
                                                                GAsyncResult     *result,
                                                                GError          **error);
-
 
 gboolean          gfreenect_device_get_accel_sync             (GFreenectDevice  *self,
                                                                gdouble          *x,
