@@ -31,6 +31,18 @@ G_BEGIN_DECLS
 
 typedef struct _GFreenectFrameMode GFreenectFrameMode;
 
+/**
+ * GFreenectFrameMode:
+ * @resolution: The image resolution of the frame from #GFreenectResolution
+ * @video_format: The video format of the frame from #GFreenectVideoFormat
+ * @depth_format: The depth format of the frame from #GFreenectDepthFormat
+ * @length: The length of the frame data, in bytes
+ * @width: The width of the frame, in pixels
+ * @height: The height of the frame, in pixels
+ * @bits_per_pixel: The number of bits to represent the data of one pixel
+ * @padding_bits_per_pixel: The number of padding bits in the data of one pixel
+ * @frame_rate: The expected frame rate
+ **/
 struct _GFreenectFrameMode
 {
   GFreenectResolution resolution;
@@ -44,12 +56,12 @@ struct _GFreenectFrameMode
   guint bits_per_pixel;
   guint padding_bits_per_pixel;
 
-  guint framerate;
+  guint frame_rate;
 };
 
 GType                gfreenect_frame_mode_get_type                (void);
-gpointer             gfreenect_frame_mode_copy                    (gpointer boxed);
-void                 gfreenect_frame_mode_free                    (gpointer boxed);
+gpointer             gfreenect_frame_mode_copy                    (GFreenectFrameMode *frame_mode);
+void                 gfreenect_frame_mode_free                    (GFreenectFrameMode *frame_mode);
 
 GFreenectFrameMode * gfreenect_frame_mode_new_from_native         (gpointer native);
 void                 gfreenect_frame_mode_set_from_native         (GFreenectFrameMode *mode,

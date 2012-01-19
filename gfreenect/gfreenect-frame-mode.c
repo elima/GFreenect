@@ -20,12 +20,35 @@
  * for more details.
  */
 
+/**
+ * SECTION:gfreenect-frame-mode
+ * @short_description: Data structure holding meta-information about a camera
+ * frame (depth, video, IR, etc).
+ *
+ * A #GFreenectFrameMode structure is built automatically by #GFreenectDevice
+ * and provided to the user through the methods to obtain the streaming frames.
+ * #GFreenectDevice holds information useful for describing and interpreting
+ * a particular data frame, like @width and @height, @bits_per_pixel, etc.
+ *
+ * Use gfreenect_frame_mode_copy() to create an exact copy of the object and
+ * gfreenect_frame_mode_free() to free it.
+ *
+ * gfreenect_frame_mode_new_from_native() and
+ * gfreenect_frame_mode_set_from_native() are used internally by
+ * #GFreenectDevice and should not normally be called in user code.
+ **/
+
 #include <string.h>
 #include <libfreenect.h>
 
 #include "gfreenect-decls.h"
 #include "gfreenect-frame-mode.h"
 
+/**
+ * gfreenect_frame_mode_get_type:
+ *
+ * Returns: The registered #GType for #GFreenectFrameMode boxed type
+ **/
 GType
 gfreenect_frame_mode_get_type (void)
 {
@@ -33,38 +56,54 @@ gfreenect_frame_mode_get_type (void)
 
   if (G_UNLIKELY (type == 0))
     type = g_boxed_type_register_static ("GFreenectFrameMode",
-                                         gfreenect_frame_mode_copy,
-                                         gfreenect_frame_mode_free);
+                                    (GBoxedCopyFunc) gfreenect_frame_mode_copy,
+                                    (GBoxedFreeFunc) gfreenect_frame_mode_free);
   return type;
 }
 
 /**
  * gfreenect_frame_mode_copy:
+ * @frame_mode: The #GFreenectFrameMode to copy
  *
- * Returns: (transfer full):
+ * Makes an exact copy of a #GFreenectFrameMode object.
+ *
+ * Returns: (transfer full): A newly created #GFreenectFrameMode. Use
+ * gfreenect_frame_mode_free() to free it.
  **/
 gpointer
-gfreenect_frame_mode_copy (gpointer boxed)
+gfreenect_frame_mode_copy (GFreenectFrameMode *frame_mode)
 {
   GFreenectFrameMode *mode;
 
   mode = g_slice_new0 (GFreenectFrameMode);
 
-  memcpy (mode, boxed, sizeof (GFreenectFrameMode));
+  memcpy (mode, frame_mode, sizeof (GFreenectFrameMode));
 
   return mode;
 }
 
+/**
+ * gfreenect_frame_mode_free:
+ * @frame_mode: The #GFreenectFrameMode to free
+ *
+ * Frees a #GFreenectFrameMode object.
+ **/
 void
-gfreenect_frame_mode_free (gpointer boxed)
+gfreenect_frame_mode_free (GFreenectFrameMode *frame_mode)
 {
-  g_slice_free (GFreenectFrameMode, boxed);
+  g_slice_free (GFreenectFrameMode, frame_mode);
 }
 
 /**
  * gfreenect_frame_mode_new_from_native:
+ * @native: Pointer to a #freenect_frame_mode structure
  *
- * Returns: (transfer full) (type GFreenectFrameMode):
+ * Creates a new #GFreenectFrameMode structure and fills all its values using
+ * information from a native #freenect_frame_mode structure. This is a low
+ * level method that a user would rarely use.
+ *
+ * Returns: (transfer full): A newly created #GFreenectFrameMode. Use
+ * gfreenect_frame_mode_free() to free it.
  **/
 GFreenectFrameMode *
 gfreenect_frame_mode_new_from_native (gpointer native)
@@ -78,6 +117,15 @@ gfreenect_frame_mode_new_from_native (gpointer native)
   return mode;
 }
 
+/**
+ * gfreenect_frame_mode_set_from_native:
+ * @mode: A #GFreenectFrameMode object
+ * @native: Pointer to a #freenect_frame_mode structure
+ *
+ * Sets all values of a #GFreenectFrameMode using the information contained
+ * in a native #freenect_frame_mode structure. This is a low level method that
+ * a user would rarely use.
+ **/
 void
 gfreenect_frame_mode_set_from_native (GFreenectFrameMode *mode, gpointer native)
 {
@@ -93,5 +141,5 @@ gfreenect_frame_mode_set_from_native (GFreenectFrameMode *mode, gpointer native)
   mode->bits_per_pixel = _mode->data_bits_per_pixel;
   mode->padding_bits_per_pixel = _mode->padding_bits_per_pixel;
 
-  mode->framerate = _mode->framerate;
+  mode->frame_rate = _mode->framerate;
 }
