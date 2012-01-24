@@ -1771,8 +1771,11 @@ gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
      threshold to avoid waiting forever for the call to complete */
   if (abs (tilt_angle - self->priv->tilt_angle) <= 1.0)
     {
-      g_simple_async_result_complete_in_idle (res);
-      g_object_unref (res);
+      if (res != NULL)
+        {
+          g_simple_async_result_complete_in_idle (res);
+          g_object_unref (res);
+        }
 
       return;
     }
