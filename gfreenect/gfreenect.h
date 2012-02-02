@@ -24,5 +24,6 @@
 #define __GFREENECT_H__
 
 #include <gfreenect-device.h>
+#include <gfreenect-frame-mode.h>
 
 #endif /* __GFREENECT_H__ */
