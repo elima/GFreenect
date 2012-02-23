@@ -355,9 +355,10 @@ gfreenect_device_dispose (GObject *obj)
   /* stop stream thread */
   if (self->priv->stream_thread != NULL)
     {
-      g_mutex_lock (self->priv->stream_mutex);
-
       self->priv->abort_stream_thread = TRUE;
+      g_thread_join (self->priv->stream_thread);
+
+      g_mutex_lock (self->priv->stream_mutex);
 
       if (self->priv->depth_frame_src_id != 0)
         {
@@ -371,7 +372,6 @@ gfreenect_device_dispose (GObject *obj)
           self->priv->video_frame_src_id = 0;
         }
 
-      g_thread_join (self->priv->stream_thread);
       self->priv->stream_thread = NULL;
 
       g_mutex_unlock (self->priv->stream_mutex);
@@ -380,11 +380,11 @@ gfreenect_device_dispose (GObject *obj)
   /* stop dispatch thread */
   if (self->priv->dispatch_thread != NULL)
     {
+      self->priv->abort_dispatch_thread = TRUE;
+      g_thread_join (self->priv->dispatch_thread);
+
       g_mutex_lock (self->priv->dispatch_mutex);
 
-      self->priv->abort_dispatch_thread = TRUE;
-
-      g_thread_join (self->priv->dispatch_thread);
       self->priv->dispatch_thread = NULL;
 
       g_mutex_unlock (self->priv->dispatch_mutex);
