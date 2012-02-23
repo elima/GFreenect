@@ -987,8 +987,16 @@ dispatch_thread_func (gpointer _data)
           g_mutex_unlock (self->priv->dispatch_mutex);
         }
 
-      if (self->priv->abort_dispatch_thread)
-        abort = TRUE;
+      if ((self->priv->set_tilt_result == NULL &&
+           self->priv->set_led_result == NULL) ||
+          (self->priv->abort_dispatch_thread))
+        {
+          abort = TRUE;
+        }
+      else
+        {
+          g_usleep (1);
+        }
     }
 
   return NULL;
