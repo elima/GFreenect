@@ -999,6 +999,10 @@ dispatch_thread_func (gpointer _data)
         }
     }
 
+  g_mutex_lock (self->priv->dispatch_mutex);
+  self->priv->dispatch_thread = NULL;
+  g_mutex_unlock (self->priv->dispatch_mutex);
+
   return NULL;
 }
 
@@ -1011,6 +1015,10 @@ stream_thread_func (gpointer _data)
     {
       freenect_process_events (self->priv->ctx);
     }
+
+  g_mutex_lock (self->priv->stream_mutex);
+  self->priv->stream_thread = NULL;
+  g_mutex_unlock (self->priv->stream_mutex);
 
   return NULL;
 }
