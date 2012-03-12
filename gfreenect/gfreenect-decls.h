@@ -74,6 +74,8 @@ typedef enum {
  * pixel
  * @GFREENECT_DEPTH_FORMAT_11BIT_PACKED: 11 bit packed depth information
  * @GFREENECT_DEPTH_FORMAT_10BIT_PACKED: 10 bit packed depth information
+ * @GFREENECT_DEPTH_FORMAT_REGISTERED: Processed depth data in mm, aligned to 640x480 RGB
+ * @GFREENECT_DEPTH_FORMAT_MM: Depth to each pixel in mm, but left unaligned to RGB image
  *
  * Available formats for the depth camera stream.
  **/
