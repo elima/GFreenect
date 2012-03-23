@@ -91,10 +91,10 @@ introspection_sources = $(gfreenect_HEADERS) $(source_c)
 
 INTROSPECTION_GIRS += @PRJ_GIR_API_NAME@.gir
 
-girdir = $(datadir)/gir-1.0
+girdir = @INTROSPECTION_GIRDIR@
 gir_DATA = $(INTROSPECTION_GIRS)
 
-typelibdir = $(libdir)/girepository-1.0
+typelibdir = @INTROSPECTION_TYPELIBDIR@
 typelib_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
 
 CLEANFILES += $(dist_gir_DATA) $(typelib_DATA)
