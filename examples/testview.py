@@ -363,6 +363,6 @@ class GFreenectView(Gtk.Window):
         Gtk.main_quit()
 
 if __name__ == '__main__':
-    Clutter.init(sys.argv)
+    GtkClutter.init(sys.argv)
     view = GFreenectView()
     Gtk.main()
