@@ -1295,7 +1295,7 @@ gboolean
 gfreenect_device_stop_depth_stream (GFreenectDevice  *self,
                                     GError          **error)
 {
-  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
 
   if (freenect_stop_depth (self->priv->dev) != 0)
     {
@@ -1409,7 +1409,7 @@ gboolean
 gfreenect_device_stop_video_stream (GFreenectDevice  *self,
                                     GError          **error)
 {
-  g_return_if_fail (GFREENECT_IS_DEVICE (self));
+  g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
 
   if (freenect_stop_video (self->priv->dev) != 0)
     {
