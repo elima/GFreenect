@@ -1260,6 +1260,7 @@ gfreenect_device_start_depth_stream (GFreenectDevice       *self,
       return FALSE;
     }
 
+  self->priv->depth_buf = g_slice_alloc0 (self->priv->depth_mode.bytes);
   if (freenect_set_depth_buffer (self->priv->dev, self->priv->depth_buf) != 0)
     {
       g_set_error (error,
@@ -1269,7 +1270,6 @@ gfreenect_device_start_depth_stream (GFreenectDevice       *self,
       return FALSE;
     }
 
-  self->priv->depth_buf = g_slice_alloc (self->priv->depth_mode.bytes);
   self->priv->got_depth_frame = FALSE;
 
 
