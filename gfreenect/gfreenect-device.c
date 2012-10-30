@@ -1010,14 +1010,127 @@ static gpointer
 stream_thread_func (gpointer _data)
 {
   GFreenectDevice *self = GFREENECT_DEVICE (_data);
+  GError *error = NULL;
+  gboolean result = TRUE;
+  gboolean depth_stream_started = FALSE;
 
-  while (! self->priv->abort_stream_thread)
+  /* initialize streams */
+  g_mutex_lock (self->priv->stream_mutex);
+
+  if (self->priv->depth_stream_started)
     {
-      freenect_process_events (self->priv->ctx);
+      /* free current depth buffer */
+      if (self->priv->depth_buf != NULL)
+        {
+          g_slice_free1 (self->priv->depth_mode.bytes, self->priv->depth_buf);
+          self->priv->depth_buf = NULL;
+        }
+
+      self->priv->depth_mode = freenect_find_depth_mode (FREENECT_RESOLUTION_MEDIUM,
+                                                         self->priv->depth_format);
+
+      if (freenect_set_depth_mode (self->priv->dev, self->priv->depth_mode) != 0)
+        {
+          g_set_error (&error,
+                       G_IO_ERROR,
+                       G_IO_ERROR_FAILED,
+                       "Failed to set depth mode");
+          result = FALSE;
+        }
+
+      if (freenect_start_depth (self->priv->dev) != 0)
+        {
+          g_set_error (&error,
+                       G_IO_ERROR,
+                       G_IO_ERROR_FAILED,
+                       "Failed to start depth stream");
+          result = FALSE;
+        }
+      else
+        g_print ("Depth stream started\n");
+
+      self->priv->depth_buf = g_slice_alloc0 (self->priv->depth_mode.bytes);
+      if (freenect_set_depth_buffer (self->priv->dev, self->priv->depth_buf) != 0)
+        {
+          g_set_error (&error,
+                       G_IO_ERROR,
+                       G_IO_ERROR_FAILED,
+                       "Failed to set depth buffer");
+          result = FALSE;
+        }
+
+      self->priv->got_depth_frame = FALSE;
+
+      depth_stream_started = self->priv->depth_stream_started;
     }
 
+  g_mutex_unlock (self->priv->stream_mutex);
+
+  if (! result)
+    {
+      g_print ("Error: %s\n", error->message);
+      g_free (error);
+
+      return NULL;
+    }
+
+  gboolean abort = FALSE;
+
+  /* process events in loop */
+  while (! abort)
+    {
+      freenect_process_events (self->priv->ctx);
+
+      g_mutex_lock (self->priv->stream_mutex);
+
+      /* check depth stream */
+      if (depth_stream_started && ! self->priv->depth_stream_started)
+        {
+          if (freenect_stop_depth (self->priv->dev) != 0)
+            g_warning ("Failed to stop depth stream");
+          /*
+          else
+            g_print ("Depth stream stopped\n");
+          */
+
+          depth_stream_started = self->priv->depth_stream_started;
+        }
+      else if (! depth_stream_started && self->priv->depth_stream_started)
+        {
+          if (freenect_start_depth (self->priv->dev) != 0)
+            g_warning ("Failed to start depth stream");
+          /*
+          else
+            g_print ("Depth stream started\n");
+          */
+
+          depth_stream_started = self->priv->depth_stream_started;
+        }
+
+      abort = self->priv->abort_stream_thread;
+
+      g_mutex_unlock (self->priv->stream_mutex);
+    }
+
+  /* stop streams */
   g_mutex_lock (self->priv->stream_mutex);
+
+  if (freenect_stop_depth (self->priv->dev) != 0)
+    {
+      g_set_error (&error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_FAILED,
+                   "Failed to stop depth stream");
+      result = FALSE;
+      /*      g_print ("******** Failed to stop depth stream\n");*/
+    }
+  /*
+  else
+    g_print ("******** Depth stream stopped\n");
+  */
+
   self->priv->stream_thread = NULL;
+
   g_mutex_unlock (self->priv->stream_mutex);
 
   return NULL;
@@ -1031,10 +1144,13 @@ launch_dispatch_thread (GFreenectDevice *self, GError **error)
   self->priv->update_tilt_angle = FALSE;
   self->priv->update_led = FALSE;
 
+  g_mutex_lock (self->priv->dispatch_mutex);
   self->priv->dispatch_thread = g_thread_create (dispatch_thread_func,
                                                  self,
                                                  TRUE,
                                                  error);
+  g_mutex_unlock (self->priv->dispatch_mutex);
+
   return self->priv->dispatch_thread != NULL;
 }
 
@@ -1047,10 +1163,13 @@ launch_stream_thread (GFreenectDevice *self, GError **error)
   self->priv->abort_stream_thread = FALSE;
 
   self->priv->glib_context = g_main_context_get_thread_default ();
+
   self->priv->stream_thread = g_thread_create (stream_thread_func,
                                                self,
                                                TRUE,
                                                error);
+  g_mutex_unlock (self->priv->stream_mutex);
+
   return self->priv->stream_thread != NULL;
 }
 
@@ -1219,6 +1338,8 @@ gfreenect_device_start_depth_stream (GFreenectDevice       *self,
                                      GFreenectDepthFormat   format,
                                      GError               **error)
 {
+  gboolean result = TRUE;
+
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
 
   if (self->priv->depth_stream_started)
@@ -1227,58 +1348,37 @@ gfreenect_device_start_depth_stream (GFreenectDevice       *self,
                    G_IO_ERROR,
                    G_IO_ERROR_PENDING,
                    "Depth stream already started, try stopping it first");
-      return FALSE;
+      result = FALSE;
+      goto out;
     }
 
-  self->priv->depth_format = format;
-
-  /* free current depth buffer */
-  if (self->priv->depth_buf != NULL)
-    {
-      g_slice_free1 (self->priv->depth_mode.bytes, self->priv->depth_buf);
-      self->priv->depth_buf = NULL;
-    }
-
-  self->priv->depth_mode = freenect_find_depth_mode (FREENECT_RESOLUTION_MEDIUM,
-                                                     self->priv->depth_format);
-
-  if (freenect_set_depth_mode (self->priv->dev, self->priv->depth_mode) != 0)
-    {
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   "Failed to set depth mode");
-      return FALSE;
-    }
-
-  if (freenect_start_depth (self->priv->dev) != 0)
-    {
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   "Failed to start depth stream");
-      return FALSE;
-    }
-
-  self->priv->depth_buf = g_slice_alloc0 (self->priv->depth_mode.bytes);
-  if (freenect_set_depth_buffer (self->priv->dev, self->priv->depth_buf) != 0)
-    {
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   "Failed to set depth buffer");
-      return FALSE;
-    }
-
-  self->priv->got_depth_frame = FALSE;
-
-
-  if (self->priv->stream_thread == NULL && ! launch_stream_thread (self, error))
-    return FALSE;
+  g_print ("Start depth stream\n");
 
   self->priv->depth_stream_started = TRUE;
+  self->priv->depth_format = format;
 
-  return TRUE;
+  if (self->priv->stream_thread != NULL)
+    {
+      if (! self->priv->video_stream_started)
+        {
+          g_set_error (error,
+                       G_IO_ERROR,
+                       G_IO_ERROR_PENDING,
+                       "Device is busy");
+          self->priv->depth_stream_started = FALSE;
+          result = FALSE;
+          goto out;
+        }
+    }
+  else if (! launch_stream_thread (self, error))
+    {
+      self->priv->depth_stream_started = FALSE;
+      result = FALSE;
+      goto out;
+    }
+
+ out:
+  return result;
 }
 
 /**
@@ -1295,23 +1395,27 @@ gboolean
 gfreenect_device_stop_depth_stream (GFreenectDevice  *self,
                                     GError          **error)
 {
+  gboolean result = TRUE;
+
   g_return_val_if_fail (GFREENECT_IS_DEVICE (self), FALSE);
 
-  if (freenect_stop_depth (self->priv->dev) != 0)
+  if (! self->priv->depth_stream_started)
     {
       g_set_error (error,
                    G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   "Failed to stop depth stream");
-      return FALSE;
+                   G_IO_ERROR_PENDING,
+                   "Depth stream has not been started");
+      result = FALSE;
+    }
+  else
+    {
+      self->priv->depth_stream_started = FALSE;
+
+      if (! self->priv->video_stream_started)
+        self->priv->abort_stream_thread = TRUE;
     }
 
-  self->priv->depth_stream_started = FALSE;
-
-  if (! self->priv->video_stream_started)
-    self->priv->abort_stream_thread = TRUE;
-
-  return TRUE;
+  return result;
 }
 
 /**
