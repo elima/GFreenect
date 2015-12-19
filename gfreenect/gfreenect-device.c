@@ -93,11 +93,11 @@ struct _GFreenectDevicePrivate
   freenect_frame_mode video_mode;
 
   GThread *dispatch_thread;
-  GMutex *dispatch_mutex;
+  GMutex dispatch_mutex;
   gboolean abort_dispatch_thread;
 
   GThread *stream_thread;
-  GMutex *stream_mutex;
+  GMutex stream_mutex;
   gboolean abort_stream_thread;
 
   guint depth_frame_src_id;
@@ -329,10 +329,10 @@ gfreenect_device_init (GFreenectDevice *self)
   priv->dev = NULL;
 
   priv->dispatch_thread = NULL;
-  priv->dispatch_mutex = g_mutex_new ();
+  g_mutex_init (&priv->dispatch_mutex);
 
   priv->stream_thread = NULL;
-  priv->stream_mutex = g_mutex_new ();
+  g_mutex_init (&priv->stream_mutex);
 
   priv->video_resolution = DEFAULT_VIDEO_RESOLUTION;
   priv->video_format = DEFAULT_VIDEO_FORMAT;
@@ -358,7 +358,7 @@ gfreenect_device_dispose (GObject *obj)
       self->priv->abort_stream_thread = TRUE;
       g_thread_join (self->priv->stream_thread);
 
-      g_mutex_lock (self->priv->stream_mutex);
+      g_mutex_lock (&self->priv->stream_mutex);
 
       if (self->priv->depth_frame_src_id != 0)
         {
@@ -374,7 +374,7 @@ gfreenect_device_dispose (GObject *obj)
 
       self->priv->stream_thread = NULL;
 
-      g_mutex_unlock (self->priv->stream_mutex);
+      g_mutex_unlock (&self->priv->stream_mutex);
     }
 
   /* stop dispatch thread */
@@ -383,17 +383,17 @@ gfreenect_device_dispose (GObject *obj)
       self->priv->abort_dispatch_thread = TRUE;
       g_thread_join (self->priv->dispatch_thread);
 
-      g_mutex_lock (self->priv->dispatch_mutex);
+      g_mutex_lock (&self->priv->dispatch_mutex);
 
       self->priv->dispatch_thread = NULL;
 
-      g_mutex_unlock (self->priv->dispatch_mutex);
+      g_mutex_unlock (&self->priv->dispatch_mutex);
     }
 
   /* cancel set tilt angle operation */
   if (self->priv->set_tilt_result != NULL)
     {
-      g_mutex_lock (self->priv->dispatch_mutex);
+      g_mutex_lock (&self->priv->dispatch_mutex);
 
       g_simple_async_result_set_error (self->priv->set_tilt_result,
                                        G_IO_ERROR,
@@ -405,13 +405,13 @@ gfreenect_device_dispose (GObject *obj)
       g_object_unref (self->priv->set_tilt_result);
       self->priv->set_tilt_result = NULL;
 
-      g_mutex_unlock (self->priv->dispatch_mutex);
+      g_mutex_unlock (&self->priv->dispatch_mutex);
     }
 
   /* cancel set led operation */
   if (self->priv->set_led_result != NULL)
     {
-      g_mutex_lock (self->priv->dispatch_mutex);
+      g_mutex_lock (&self->priv->dispatch_mutex);
 
       g_simple_async_result_set_error (self->priv->set_led_result,
                                        G_IO_ERROR,
@@ -423,7 +423,7 @@ gfreenect_device_dispose (GObject *obj)
       g_object_unref (self->priv->set_led_result);
       self->priv->set_led_result = NULL;
 
-      g_mutex_unlock (self->priv->dispatch_mutex);
+      g_mutex_unlock (&self->priv->dispatch_mutex);
     }
 
   /* cancel all pending state dependent operations */
@@ -431,7 +431,7 @@ gfreenect_device_dispose (GObject *obj)
     {
       GList *node;
 
-      g_mutex_lock (self->priv->dispatch_mutex);
+      g_mutex_lock (&self->priv->dispatch_mutex);
 
       node = self->priv->state_dependent_results;
       while (node != NULL)
@@ -455,7 +455,7 @@ gfreenect_device_dispose (GObject *obj)
       g_list_free (self->priv->state_dependent_results);
       self->priv->state_dependent_results = NULL;
 
-      g_mutex_unlock (self->priv->dispatch_mutex);
+      g_mutex_unlock (&self->priv->dispatch_mutex);
     }
 
   if (self->priv->dev != NULL)
@@ -478,8 +478,8 @@ gfreenect_device_finalize (GObject *obj)
 {
   GFreenectDevice *self = GFREENECT_DEVICE (obj);
 
-  g_mutex_free (self->priv->stream_mutex);
-  g_mutex_free (self->priv->dispatch_mutex);
+  g_mutex_clear (&self->priv->stream_mutex);
+  g_mutex_clear (&self->priv->dispatch_mutex);
 
   if (self->priv->depth_buf != NULL)
     g_slice_free1 (self->priv->depth_mode.bytes, self->priv->depth_buf);
@@ -605,7 +605,7 @@ on_depth_frame_main_loop (gpointer user_data)
   GFreenectDevice *self = GFREENECT_DEVICE (user_data);
   gboolean got_frame = FALSE;
 
-  g_mutex_lock (self->priv->stream_mutex);
+  g_mutex_lock (&self->priv->stream_mutex);
 
   self->priv->depth_frame_src_id = 0;
 
@@ -615,7 +615,7 @@ on_depth_frame_main_loop (gpointer user_data)
       self->priv->got_depth_frame = FALSE;
     }
 
-  g_mutex_unlock (self->priv->stream_mutex);
+  g_mutex_unlock (&self->priv->stream_mutex);
 
   if (got_frame)
     g_signal_emit (self, gfreenect_device_signals[SIGNAL_DEPTH_FRAME], 0, NULL);
@@ -631,7 +631,7 @@ on_depth_frame (freenect_device *dev, void *depth, uint32_t timestamp)
 
   self = freenect_get_user (dev);
 
-  g_mutex_lock (self->priv->stream_mutex);
+  g_mutex_lock (&self->priv->stream_mutex);
 
   self->priv->got_depth_frame = TRUE;
 
@@ -647,7 +647,7 @@ on_depth_frame (freenect_device *dev, void *depth, uint32_t timestamp)
                                                     self);
     }
 
-  g_mutex_unlock (self->priv->stream_mutex);
+  g_mutex_unlock (&self->priv->stream_mutex);
 }
 
 static gboolean
@@ -656,7 +656,7 @@ on_video_frame_main_loop (gpointer user_data)
   GFreenectDevice *self = GFREENECT_DEVICE (user_data);
   gboolean got_frame = FALSE;
 
-  g_mutex_lock (self->priv->stream_mutex);
+  g_mutex_lock (&self->priv->stream_mutex);
 
   self->priv->video_frame_src_id = 0;
 
@@ -666,7 +666,7 @@ on_video_frame_main_loop (gpointer user_data)
       self->priv->got_video_frame = FALSE;
     }
 
-  g_mutex_unlock (self->priv->stream_mutex);
+  g_mutex_unlock (&self->priv->stream_mutex);
 
   if (got_frame)
     g_signal_emit (self, gfreenect_device_signals[SIGNAL_VIDEO_FRAME], 0, NULL);
@@ -681,7 +681,7 @@ on_video_frame (freenect_device *dev, void *buf, uint32_t timestamp)
 
   self = freenect_get_user (dev);
 
-  g_mutex_lock (self->priv->stream_mutex);
+  g_mutex_lock (&self->priv->stream_mutex);
 
   self->priv->got_video_frame = TRUE;
 
@@ -697,7 +697,7 @@ on_video_frame (freenect_device *dev, void *buf, uint32_t timestamp)
                                                     self);
     }
 
-  g_mutex_unlock (self->priv->stream_mutex);
+  g_mutex_unlock (&self->priv->stream_mutex);
 }
 
 static gboolean
@@ -820,7 +820,7 @@ init_async (GAsyncInitable      *initable,
   if (data->cancellable != NULL)
     g_object_ref (data->cancellable);
 
-  g_thread_create (init_in_thread, data, TRUE, NULL);
+  g_thread_new (NULL, init_in_thread, data);
 }
 
 static gboolean
@@ -846,7 +846,7 @@ dispatch_thread_func (gpointer _data)
       /* update tilt angle */
       if (self->priv->update_tilt_angle)
         {
-          g_mutex_lock (self->priv->dispatch_mutex);
+          g_mutex_lock (&self->priv->dispatch_mutex);
 
           self->priv->update_tilt_angle = FALSE;
 
@@ -856,13 +856,13 @@ dispatch_thread_func (gpointer _data)
               g_warning ("Failed to set tilt");
             }
 
-          g_mutex_unlock (self->priv->dispatch_mutex);
+          g_mutex_unlock (&self->priv->dispatch_mutex);
         }
 
       /* update led */
       if (self->priv->update_led)
         {
-          g_mutex_lock (self->priv->dispatch_mutex);
+          g_mutex_lock (&self->priv->dispatch_mutex);
 
           self->priv->update_led = FALSE;
 
@@ -886,7 +886,7 @@ dispatch_thread_func (gpointer _data)
               self->priv->set_led_result = NULL;
             }
 
-          g_mutex_unlock (self->priv->dispatch_mutex);
+          g_mutex_unlock (&self->priv->dispatch_mutex);
         }
 
       /* whether to update tilt state */
@@ -908,7 +908,7 @@ dispatch_thread_func (gpointer _data)
           if (update_tilt_failed)
             {
               /* complete the 'set-tilt' operation with error */
-              g_mutex_lock (self->priv->dispatch_mutex);
+              g_mutex_lock (&self->priv->dispatch_mutex);
 
               g_simple_async_result_set_error (self->priv->set_tilt_result,
                                                G_IO_ERROR,
@@ -919,14 +919,14 @@ dispatch_thread_func (gpointer _data)
               g_object_unref (self->priv->set_tilt_result);
               self->priv->set_tilt_result = NULL;
 
-              g_mutex_unlock (self->priv->dispatch_mutex);
+              g_mutex_unlock (&self->priv->dispatch_mutex);
             }
           else
             {
               if (state->tilt_status != TILT_STATUS_MOVING && self->priv->tilt_motor_moving)
                 {
                   /* complete the 'set-tilt' operation */
-                  g_mutex_lock (self->priv->dispatch_mutex);
+                  g_mutex_lock (&self->priv->dispatch_mutex);
 
                   self->priv->tilt_motor_moving = FALSE;
 
@@ -935,7 +935,7 @@ dispatch_thread_func (gpointer _data)
                   g_object_unref (self->priv->set_tilt_result);
                   self->priv->set_tilt_result = NULL;
 
-                  g_mutex_unlock (self->priv->dispatch_mutex);
+                  g_mutex_unlock (&self->priv->dispatch_mutex);
                 }
               else if (state->tilt_status == TILT_STATUS_MOVING)
                 {
@@ -949,7 +949,7 @@ dispatch_thread_func (gpointer _data)
         {
           GList *node;
 
-          g_mutex_lock (self->priv->dispatch_mutex);
+          g_mutex_lock (&self->priv->dispatch_mutex);
 
           node = self->priv->state_dependent_results;
           while (node != NULL)
@@ -969,7 +969,7 @@ dispatch_thread_func (gpointer _data)
                 {
                   freenect_raw_tilt_state *state_copy =
                                            g_new (freenect_raw_tilt_state, 1);
-                  memcpy (state_copy, state, sizeof (state));
+                  memcpy (state_copy, state, sizeof (freenect_raw_tilt_state));
 
                   g_simple_async_result_set_op_res_gpointer (res, state_copy,
                                                              g_free);
@@ -984,7 +984,7 @@ dispatch_thread_func (gpointer _data)
           g_list_free (self->priv->state_dependent_results);
           self->priv->state_dependent_results = NULL;
 
-          g_mutex_unlock (self->priv->dispatch_mutex);
+          g_mutex_unlock (&self->priv->dispatch_mutex);
         }
 
       if ((self->priv->set_tilt_result == NULL &&
@@ -999,9 +999,9 @@ dispatch_thread_func (gpointer _data)
         }
     }
 
-  g_mutex_lock (self->priv->dispatch_mutex);
+  g_mutex_lock (&self->priv->dispatch_mutex);
   self->priv->dispatch_thread = NULL;
-  g_mutex_unlock (self->priv->dispatch_mutex);
+  g_mutex_unlock (&self->priv->dispatch_mutex);
 
   return NULL;
 }
@@ -1016,9 +1016,9 @@ stream_thread_func (gpointer _data)
       freenect_process_events (self->priv->ctx);
     }
 
-  g_mutex_lock (self->priv->stream_mutex);
+  g_mutex_lock (&self->priv->stream_mutex);
   self->priv->stream_thread = NULL;
-  g_mutex_unlock (self->priv->stream_mutex);
+  g_mutex_unlock (&self->priv->stream_mutex);
 
   return NULL;
 }
@@ -1031,10 +1031,9 @@ launch_dispatch_thread (GFreenectDevice *self, GError **error)
   self->priv->update_tilt_angle = FALSE;
   self->priv->update_led = FALSE;
 
-  self->priv->dispatch_thread = g_thread_create (dispatch_thread_func,
-                                                 self,
-                                                 TRUE,
-                                                 error);
+  self->priv->dispatch_thread = g_thread_new (NULL,
+                                              dispatch_thread_func,
+                                              self);
   return self->priv->dispatch_thread != NULL;
 }
 
@@ -1047,10 +1046,9 @@ launch_stream_thread (GFreenectDevice *self, GError **error)
   self->priv->abort_stream_thread = FALSE;
 
   self->priv->glib_context = g_main_context_get_thread_default ();
-  self->priv->stream_thread = g_thread_create (stream_thread_func,
-                                               self,
-                                               TRUE,
-                                               error);
+  self->priv->stream_thread = g_thread_new (NULL,
+                                            stream_thread_func,
+                                            self);
   return self->priv->stream_thread != NULL;
 }
 
@@ -1065,7 +1063,7 @@ on_set_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
                                             on_set_tilt_cancelled,
                                             user_data);
 
-      g_mutex_lock (self->priv->dispatch_mutex);
+      g_mutex_lock (&self->priv->dispatch_mutex);
       g_simple_async_result_set_error (self->priv->set_tilt_result,
                                        G_IO_ERROR,
                                        G_IO_ERROR_CANCELLED,
@@ -1075,7 +1073,7 @@ on_set_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
       g_object_unref (self->priv->set_tilt_result);
       self->priv->set_tilt_result = NULL;
 
-      g_mutex_unlock (self->priv->dispatch_mutex);
+      g_mutex_unlock (&self->priv->dispatch_mutex);
     }
 }
 
@@ -1090,7 +1088,7 @@ on_set_led_cancelled (GCancellable *cancellable, gpointer user_data)
                                             on_set_led_cancelled,
                                             user_data);
 
-      g_mutex_lock (self->priv->dispatch_mutex);
+      g_mutex_lock (&self->priv->dispatch_mutex);
       g_simple_async_result_set_error (self->priv->set_led_result,
                                        G_IO_ERROR,
                                        G_IO_ERROR_CANCELLED,
@@ -1100,7 +1098,7 @@ on_set_led_cancelled (GCancellable *cancellable, gpointer user_data)
       g_object_unref (self->priv->set_led_result);
       self->priv->set_led_result = NULL;
 
-      g_mutex_unlock (self->priv->dispatch_mutex);
+      g_mutex_unlock (&self->priv->dispatch_mutex);
     }
 }
 
@@ -1117,7 +1115,7 @@ on_get_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
                                         on_get_tilt_cancelled,
                                         user_data);
 
-  g_mutex_lock (self->priv->dispatch_mutex);
+  g_mutex_lock (&self->priv->dispatch_mutex);
 
   self->priv->state_dependent_results =
                         g_list_remove (self->priv->state_dependent_results,
@@ -1130,7 +1128,7 @@ on_get_tilt_cancelled (GCancellable *cancellable, gpointer user_data)
   g_simple_async_result_complete_in_idle (res);
   g_object_unref (res);
 
-  g_mutex_unlock (self->priv->dispatch_mutex);
+  g_mutex_unlock (&self->priv->dispatch_mutex);
 }
 
 /* public methods */
@@ -1477,7 +1475,7 @@ gfreenect_device_set_led (GFreenectDevice     *self,
   if (self->priv->dispatch_thread == NULL)
     launch_dispatch_thread (self, NULL);
 
-  g_mutex_lock (self->priv->dispatch_mutex);
+  g_mutex_lock (&self->priv->dispatch_mutex);
 
   self->priv->set_led_result = res;
   if (cancellable != NULL)
@@ -1489,7 +1487,7 @@ gfreenect_device_set_led (GFreenectDevice     *self,
   self->priv->led = led;
   self->priv->update_led = TRUE;
 
-  g_mutex_unlock (self->priv->dispatch_mutex);
+  g_mutex_unlock (&self->priv->dispatch_mutex);
 }
 
 /**
@@ -1799,7 +1797,7 @@ gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
   if (self->priv->dispatch_thread == NULL)
     launch_dispatch_thread (self, NULL);
 
-  g_mutex_lock (self->priv->dispatch_mutex);
+  g_mutex_lock (&self->priv->dispatch_mutex);
 
   self->priv->set_tilt_result = res;
   if (cancellable != NULL)
@@ -1811,7 +1809,7 @@ gfreenect_device_set_tilt_angle (GFreenectDevice     *self,
   self->priv->tilt_angle = tilt_angle;
   self->priv->update_tilt_angle = TRUE;
 
-  g_mutex_unlock (self->priv->dispatch_mutex);
+  g_mutex_unlock (&self->priv->dispatch_mutex);
 }
 
 /**
@@ -1872,13 +1870,13 @@ gfreenect_device_get_tilt_angle (GFreenectDevice     *self,
                       G_CALLBACK (on_get_tilt_cancelled),
                       res);
 
-  g_mutex_lock (self->priv->dispatch_mutex);
+  g_mutex_lock (&self->priv->dispatch_mutex);
 
   self->priv->state_dependent_results =
                         g_list_append (self->priv->state_dependent_results,
                                        res);
 
-  g_mutex_unlock (self->priv->dispatch_mutex);
+  g_mutex_unlock (&self->priv->dispatch_mutex);
 }
 
 /**
@@ -1996,13 +1994,13 @@ gfreenect_device_get_accel (GFreenectDevice     *self,
                       G_CALLBACK (on_get_tilt_cancelled),
                       res);
 
-  g_mutex_lock (self->priv->dispatch_mutex);
+  g_mutex_lock (&self->priv->dispatch_mutex);
 
   self->priv->state_dependent_results =
                         g_list_append (self->priv->state_dependent_results,
                                        res);
 
-  g_mutex_unlock (self->priv->dispatch_mutex);
+  g_mutex_unlock (&self->priv->dispatch_mutex);
 }
 
 /**
